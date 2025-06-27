@@ -1,0 +1,23 @@
+{
+  "name": "vigilancia1",
+  "version": "1.0.0",
+  "description": "Sistema de vigilancia web con detección de movimiento",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "vigilancia",
+    "webcam",
+    "detección de movimiento"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.5.0",
+    "express": "^4.18.2",
+    "fs-extra": "^11.2.0",
+    "moment": "^2.30.1",
+    "twilio": "^5.7.1"
+  }
+}
