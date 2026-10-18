@@ -106,3 +106,16 @@ Sistema-vigilancia-betha/
 ---
 
 © 2026 Betha Sentinel Security Hub. Licencia MIT.
+
+---
+
+## 📶 Cámaras Wi-Fi / IP (RTSP) — v2.1
+
+Además de la webcam, puedes usar una cámara Wi-Fi (Tapo, Reolink, Ezviz...).
+
+1. Instala **FFmpeg** y comprueba que `ffmpeg -version` funciona en la terminal.
+2. En el panel: **Ajustes > Fuente de cámara > Cámara Wi-Fi / IP**.
+3. Escribe la URL, por ejemplo `rtsp://usuario:clave@192.168.1.50:554/stream1`, y pulsa **Probar conexión**.
+4. Guarda e inicia la cámara. El servidor convierte el RTSP a MJPEG y la IA detecta igual que con la webcam.
+
+> La URL (con su clave) se guarda en la base de datos local. No expongas este servidor a internet sin protegerlo.

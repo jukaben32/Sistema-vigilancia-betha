@@ -1,11 +1,12 @@
 /**
  * ============================================================================
- * BETHA SENTINEL // CLIENT NEURAL ENGINE & DASHBOARD CONTROLLER
+ * BETHA SENTINEL // CLIENT NEURAL ENGINE & DASHBOARD CONTROLLER (v2.1)
  * ============================================================================
  */
 
 // Elementos DOM Principales
 const video = document.getElementById('videoElement');
+const rtspImageElement = document.getElementById('rtspImageElement');
 const overlayCanvas = document.getElementById('overlayCanvas');
 const videoContainer = document.getElementById('videoContainer');
 const videoPlaceholder = document.getElementById('videoPlaceholder');
@@ -22,6 +23,7 @@ const btnFullscreen = document.getElementById('btnFullscreen');
 const btnToggleSound = document.getElementById('btnToggleSound');
 const soundIcon = document.getElementById('soundIcon');
 const recBadge = document.getElementById('recBadge');
+const sourceBadge = document.getElementById('sourceBadge');
 const hudClock = document.getElementById('hudClock');
 const aiEngineStatus = document.getElementById('aiEngineStatus');
 const wsStatus = document.getElementById('wsStatus');
@@ -87,6 +89,15 @@ const retentionValueLabel = document.getElementById('retentionValueLabel');
 const btnManualCleanup = document.getElementById('btnManualCleanup');
 const btnSaveSettings = document.getElementById('btnSaveSettings');
 
+// Fuente de Cámara (WebRTC vs RTSP)
+const sourceWebRTCRadio = document.getElementById('sourceWebRTC');
+const sourceRTSPRadio = document.getElementById('sourceRTSP');
+const rtspConfigSection = document.getElementById('rtspConfigSection');
+const rtspUrlInput = document.getElementById('rtspUrlInput');
+const rtspTransportSelect = document.getElementById('rtspTransportSelect');
+const btnTestRtsp = document.getElementById('btnTestRtsp');
+const rtspTestResult = document.getElementById('rtspTestResult');
+
 // ==========================================
 // ESTADO GLOBAL
 // ==========================================
@@ -94,10 +105,14 @@ let stream = null;
 let isStreaming = false;
 let isAiActive = true;
 let isSoundEnabled = true;
-let isDrawingROI = false;
 let activeROI = { enabled: false, x: 10, y: 10, width: 80, height: 80 }; // Porcentajes
 let cocoModel = null;
 let ws = null;
+
+// Fuente de Video actual
+let currentVideoSource = 'webrtc'; // 'webrtc' o 'rtsp'
+let currentRtspUrl = '';
+let currentRtspTransport = 'tcp';
 
 // Paginación y Filtros
 let currentPage = 1;
@@ -134,7 +149,6 @@ function playAlertSiren() {
         const gain = audioCtx.createGain();
         osc.type = 'sawtooth';
         
-        // Frecuencia tipo alerta táctica
         const now = audioCtx.currentTime;
         osc.frequency.setValueAtTime(880, now);
         osc.frequency.exponentialRampToValueAtTime(1760, now + 0.15);
@@ -181,7 +195,6 @@ async function initModel() {
         aiEngineStatus.textContent = 'IA: CARGANDO COCO-SSD...';
         aiEngineStatus.className = 'text-warning font-mono';
         
-        // Carga del modelo pre-entrenado COCO-SSD
         cocoModel = await cocoSsd.load({ base: 'lite_mobilenet_v2' });
         
         aiEngineStatus.textContent = 'IA: ACTIVA (COCO-SSD)';
@@ -195,11 +208,20 @@ async function initModel() {
 }
 
 // ==========================================
-// CONTROL DE CÁMARA & STREAMING
+// CONTROL DE CÁMARA (WEBRTC vs RTSP)
 // ==========================================
 async function startCamera() {
+    initAudio();
+    if (currentVideoSource === 'rtsp') {
+        startRtspStream();
+    } else {
+        startWebRtcCamera();
+    }
+}
+
+// Iniciar cámara local o webcam USB
+async function startWebRtcCamera() {
     try {
-        initAudio();
         const constraints = {
             video: {
                 width: { ideal: 1280 },
@@ -211,6 +233,8 @@ async function startCamera() {
 
         stream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = stream;
+        video.style.display = 'block';
+        rtspImageElement.style.display = 'none';
 
         video.onloadedmetadata = () => {
             overlayCanvas.width = video.videoWidth;
@@ -219,30 +243,77 @@ async function startCamera() {
             videoPlaceholder.style.display = 'none';
             toggleCameraText.textContent = 'Detener';
             recBadge.className = 'badge bg-danger rec-badge';
-            recBadge.innerHTML = '<span class="blink-dot"></span> REC';
+            recBadge.innerHTML = '<span class="blink-dot"></span> LIVE';
+            sourceBadge.textContent = 'WEBRTC';
+            sourceBadge.className = 'badge bg-dark-subtle text-emerald font-mono';
             
-            // Iniciar ciclo de detección
             requestAnimationFrame(detectLoop);
         };
     } catch (err) {
         console.error('Error al acceder a la cámara:', err);
-        alert('No se pudo acceder a la cámara. Asegúrate de conceder permisos.');
+        alert('No se pudo acceder a la cámara local. Si usas cámara Wi-Fi, cámbiala en Ajustes.');
     }
 }
 
-function stopCamera() {
+// Iniciar cámara Wi-Fi vía stream RTSP puenteado
+function startRtspStream() {
+    if (!currentRtspUrl) {
+        alert('No tienes configurada ninguna URL RTSP. Ve a Ajustes > Cámara Wi-Fi e ingrésala.');
+        settingsModal.show();
+        return;
+    }
+
+    video.style.display = 'none';
     if (stream) {
         stream.getTracks().forEach(t => t.stop());
         video.srcObject = null;
         stream = null;
     }
+
+    rtspImageElement.style.display = 'block';
+    videoPlaceholder.style.display = 'none';
+    sourceBadge.textContent = 'WI-FI RTSP';
+    sourceBadge.className = 'badge bg-dark-subtle text-info font-mono';
+
+    // Cargar stream MJPEG desde el puente Express / FFmpeg
+    rtspImageElement.src = `/api/stream/mjpeg?t=${Date.now()}`;
+
+    rtspImageElement.onload = () => {
+        if (!isStreaming) {
+            overlayCanvas.width = rtspImageElement.naturalWidth || 1280;
+            overlayCanvas.height = rtspImageElement.naturalHeight || 720;
+            isStreaming = true;
+            toggleCameraText.textContent = 'Detener';
+            recBadge.className = 'badge bg-danger rec-badge';
+            recBadge.innerHTML = '<span class="blink-dot"></span> LIVE';
+            requestAnimationFrame(detectLoop);
+        }
+    };
+
+    rtspImageElement.onerror = () => {
+        console.warn('[RTSP] Error o reconexión del stream.');
+    };
+}
+
+function stopCamera() {
+    if (currentVideoSource === 'rtsp') {
+        rtspImageElement.src = '';
+        rtspImageElement.style.display = 'none';
+        fetch('/api/stream/stop', { method: 'POST' }).catch(() => {});
+    } else {
+        if (stream) {
+            stream.getTracks().forEach(t => t.stop());
+            video.srcObject = null;
+            stream = null;
+        }
+    }
+    
     isStreaming = false;
     videoPlaceholder.style.display = 'flex';
     toggleCameraText.textContent = 'Iniciar Cámara';
     recBadge.className = 'badge bg-secondary rec-badge';
     recBadge.innerHTML = 'INACTIVO';
 
-    // Limpiar canvas
     const ctx = overlayCanvas.getContext('2d');
     ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 }
@@ -332,10 +403,17 @@ async function detectLoop() {
     const ctx = overlayCanvas.getContext('2d');
     ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
-    if (isAiActive && cocoModel && video.readyState === 4) {
+    // Determinar la fuente visual activa
+    const isRtsp = currentVideoSource === 'rtsp';
+    const visualElement = isRtsp ? rtspImageElement : video;
+    const isReady = isRtsp 
+        ? (rtspImageElement.complete && rtspImageElement.naturalWidth > 0)
+        : (video.readyState === 4);
+
+    if (isAiActive && cocoModel && isReady) {
         try {
-            // Predicción por TensorFlow
-            const predictions = await cocoModel.detect(video);
+            // Predicción por TensorFlow sobre la fuente activa
+            const predictions = await cocoModel.detect(visualElement);
             
             // Filtrar predicciones según configuración y ROI
             const validDetections = filterDetections(predictions);
@@ -363,12 +441,9 @@ function filterDetections(predictions) {
     if (classAnimals.checked) allowed.push('dog', 'cat', 'bird', 'horse');
 
     return predictions.filter(pred => {
-        // Umbral de confianza
         if (pred.score < detectionThreshold) return false;
-        // Clase permitida
         if (!allowed.includes(pred.class)) return false;
 
-        // Comprobación de Zona ROI si está activa
         if (activeROI.enabled) {
             const [bx, by, bw, bh] = pred.bbox;
             const centerX = (bx + bw / 2) / overlayCanvas.width * 100;
@@ -392,7 +467,6 @@ function drawTacticalHUD(ctx, detections) {
         const color = isPerson ? '#10b981' : '#06b6d4';
         const labelText = isPerson ? `👤 PERSONA ${score}%` : `🎯 ${det.class.toUpperCase()} ${score}%`;
 
-        // Rectángulo principal con glow
         ctx.save();
         ctx.strokeStyle = color;
         ctx.lineWidth = 2.5;
@@ -400,25 +474,21 @@ function drawTacticalHUD(ctx, detections) {
         ctx.shadowBlur = 10;
         ctx.strokeRect(x, y, width, height);
 
-        // Esquinas tácticas reforzadas
         const cornerLength = Math.min(20, width / 4, height / 4);
         ctx.lineWidth = 4;
         
-        // Esquina sup-izq
         ctx.beginPath();
         ctx.moveTo(x, y + cornerLength);
         ctx.lineTo(x, y);
         ctx.lineTo(x + cornerLength, y);
         ctx.stroke();
 
-        // Esquina sup-der
         ctx.beginPath();
         ctx.moveTo(x + width - cornerLength, y);
         ctx.lineTo(x + width, y);
         ctx.lineTo(x + width, y + cornerLength);
         ctx.stroke();
 
-        // Etiqueta superior
         ctx.shadowBlur = 0;
         ctx.font = 'bold 12px "JetBrains Mono", monospace';
         const textWidth = ctx.measureText(labelText).width;
@@ -438,28 +508,25 @@ function drawTacticalHUD(ctx, detections) {
 // ==========================================
 async function handleTriggerEvent(detection) {
     const now = Date.now();
-    if (now - lastAlertTimestamp < cooldownMs) return; // En cooldown anti-spam
+    if (now - lastAlertTimestamp < cooldownMs) return;
     if (isRecordingClip) return;
 
     lastAlertTimestamp = now;
     isRecordingClip = true;
 
-    // Mostrar banner de alerta en pantalla
     showHUDAlert(detection);
-
-    // Sonido de sirena
     playAlertSiren();
 
-    // 1. Tomar snapshot de alta resolución con la caja de detección
+    // 1. Snapshot HD con overlay
     const photoBlob = await takeSnapshotWithOverlay(detection);
 
-    // 2. Grabar clip de video WebM de 6 segundos si está activado
+    // 2. Grabar clip de video (WebM)
     let videoBlob = null;
-    if (videoClipsEnabled.checked && window.MediaRecorder && stream) {
+    if (videoClipsEnabled.checked) {
         videoBlob = await recordVideoClip(6000);
     }
 
-    // 3. Subir al backend mediante FormData
+    // 3. Subir al backend
     await uploadEvidence({
         photoBlob,
         videoBlob,
@@ -471,7 +538,6 @@ async function handleTriggerEvent(detection) {
     isRecordingClip = false;
 }
 
-// Mostrar banner táctico en video
 function showHUDAlert(detection) {
     const isPerson = detection.class === 'person';
     hudAlertText.textContent = isPerson ? `¡PERSONA DETECTADA! (${Math.round(detection.score * 100)}%)` : `¡${detection.class.toUpperCase()} DETECTADO!`;
@@ -481,18 +547,21 @@ function showHUDAlert(detection) {
     }, 4000);
 }
 
-// Capturar frame compuesto (Video + HUD)
+// Capturar frame compuesto (Video o RTSP + HUD)
 function takeSnapshotWithOverlay(detection) {
     return new Promise(resolve => {
         const offCanvas = document.createElement('canvas');
-        offCanvas.width = video.videoWidth;
-        offCanvas.height = video.videoHeight;
+        const isRtsp = currentVideoSource === 'rtsp';
+        const visualSource = isRtsp ? rtspImageElement : video;
+
+        const w = isRtsp ? (rtspImageElement.naturalWidth || 1280) : video.videoWidth;
+        const h = isRtsp ? (rtspImageElement.naturalHeight || 720) : video.videoHeight;
+        offCanvas.width = w;
+        offCanvas.height = h;
+
         const offCtx = offCanvas.getContext('2d');
+        offCtx.drawImage(visualSource, 0, 0, w, h);
 
-        // Dibujar frame original de video
-        offCtx.drawImage(video, 0, 0, offCanvas.width, offCanvas.height);
-
-        // Dibujar caja de detección sobre la foto para evidencia forense
         if (detection) {
             drawTacticalHUD(offCtx, [detection]);
         }
@@ -501,18 +570,42 @@ function takeSnapshotWithOverlay(detection) {
     });
 }
 
-// Grabar clip de video en búfer
+// Grabar clip de video (soporta WebRTC y canvas stream para RTSP)
 function recordVideoClip(durationMs = 6000) {
     return new Promise(resolve => {
         try {
             const recordedChunks = [];
-            const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8' });
+            let recordStream = stream;
+            let drawTimer = null;
+
+            // Si es RTSP, el <img> MJPEG no es grabable directamente:
+            // lo copiamos 15 veces por segundo a un canvas oculto y grabamos ese canvas
+            if (currentVideoSource === 'rtsp') {
+                const w = rtspImageElement.naturalWidth || 1280;
+                const h = rtspImageElement.naturalHeight || 720;
+                const recCanvas = document.createElement('canvas');
+                recCanvas.width = w;
+                recCanvas.height = h;
+                const recCtx = recCanvas.getContext('2d');
+                drawTimer = setInterval(() => {
+                    recCtx.drawImage(rtspImageElement, 0, 0, w, h);
+                }, 66);
+                recordStream = recCanvas.captureStream ? recCanvas.captureStream(15) : null;
+            }
+
+            if (!recordStream) {
+                if (drawTimer) clearInterval(drawTimer);
+                return resolve(null);
+            }
+
+            const recorder = new MediaRecorder(recordStream, { mimeType: 'video/webm;codecs=vp8' });
 
             recorder.ondataavailable = e => {
                 if (e.data && e.data.size > 0) recordedChunks.push(e.data);
             };
 
             recorder.onstop = () => {
+                if (drawTimer) clearInterval(drawTimer);
                 const blob = new Blob(recordedChunks, { type: 'video/webm' });
                 resolve(blob);
             };
@@ -531,7 +624,6 @@ function recordVideoClip(durationMs = 6000) {
     });
 }
 
-// Subir evidencia al servidor
 async function uploadEvidence({ photoBlob, videoBlob, eventType, label, confidence }) {
     try {
         const formData = new FormData();
@@ -551,7 +643,7 @@ async function uploadEvidence({ photoBlob, videoBlob, eventType, label, confiden
 
         const data = await res.json();
         if (data.success) {
-            console.log('[EVIDENCIA] Guardada y notificada con éxito:', data.event);
+            console.log('[EVIDENCIA] Guardada y notificada:', data.event);
             loadStats();
         }
     } catch (err) {
@@ -618,7 +710,6 @@ function initWebSocket() {
 }
 
 function handleIncomingEvent(event) {
-    // Si estamos en la página 1, prepend a la galería
     if (currentPage === 1 && (currentFilterType === 'all' || currentFilterType === event.event_type)) {
         const card = createEventCard(event);
         gallery.prepend(card);
@@ -723,13 +814,11 @@ function createEventCard(event) {
         </button>
     `;
 
-    // Clic en la tarjeta para abrir vista forense
     card.addEventListener('click', (e) => {
         if (e.target.closest('.star-btn-card')) return;
         showForensicModal(event);
     });
 
-    // Clic en estrella
     const starBtn = card.querySelector('.star-btn-card');
     starBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
@@ -739,7 +828,6 @@ function createEventCard(event) {
     return card;
 }
 
-// Filtros por tab
 filterButtons.forEach(btn => {
     btn.addEventListener('click', () => {
         filterButtons.forEach(b => b.classList.remove('active'));
@@ -787,13 +875,9 @@ function showForensicModal(event) {
     modalConfidence.textContent = `${confidencePct}%`;
     imageTimestamp.textContent = new Date(event.timestamp).toLocaleString('es-ES', { hour12: false });
 
-    // Estado protegido
     updateModalStarStatus(event.is_starred);
-
-    // Configurar imagen
     previewImage.src = event.photo_path;
 
-    // Configurar video si existe
     if (event.video_path) {
         previewVideo.src = event.video_path;
         btnViewVideo.style.display = 'inline-block';
@@ -802,9 +886,7 @@ function showForensicModal(event) {
         btnViewVideo.style.display = 'none';
     }
 
-    // Por defecto mostrar foto
     showPhotoViewer();
-
     imagePreviewModal.show();
 }
 
@@ -841,7 +923,6 @@ function updateModalStarStatus(isStarred) {
     }
 }
 
-// Proteger / Desproteger desde Modal
 btnModalStar.addEventListener('click', async () => {
     if (!currentSelectedEvent) return;
     const res = await toggleStarEvent(currentSelectedEvent.id);
@@ -854,15 +935,13 @@ btnModalStar.addEventListener('click', async () => {
 async function toggleStarEvent(id) {
     try {
         const res = await fetch(`/api/events/${id}/star`, { method: 'PATCH' });
-        const data = await res.json();
-        return data;
+        return await res.json();
     } catch (e) {
         console.error(e);
         return null;
     }
 }
 
-// Eliminar desde Modal
 btnModalDelete.addEventListener('click', async () => {
     if (!currentSelectedEvent) return;
     if (!confirm('¿Seguro que deseas eliminar permanentemente esta captura y su grabación?')) return;
@@ -880,7 +959,6 @@ btnModalDelete.addEventListener('click', async () => {
     }
 });
 
-// Descargar
 downloadBtn.addEventListener('click', () => {
     if (!currentSelectedEvent) return;
     const isVideo = videoViewerContainer.style.display === 'block' && currentSelectedEvent.video_path;
@@ -908,7 +986,6 @@ async function loadTimeline() {
 
         events.forEach(ev => {
             const evTime = new Date(ev.timestamp).getTime();
-            // Calcular porcentaje a lo largo de 24 horas (0% hace 24h, 100% ahora)
             const pct = Math.max(0, Math.min(100, ((evTime - past24h) / (24 * 60 * 60 * 1000)) * 100));
 
             const pin = document.createElement('div');
@@ -975,6 +1052,26 @@ async function loadSettings() {
         retentionValueLabel.textContent = `${retentionRange.value} días`;
         statRetentionInfo.textContent = `${retentionRange.value} Días`;
 
+        // Fuente de Video (WebRTC vs RTSP)
+        currentVideoSource = s.video_source || 'webrtc';
+        currentRtspUrl = s.rtsp_url || '';
+        currentRtspTransport = s.rtsp_transport || 'tcp';
+
+        if (currentVideoSource === 'rtsp') {
+            sourceRTSPRadio.checked = true;
+            rtspConfigSection.style.display = 'block';
+            sourceBadge.textContent = 'WI-FI RTSP';
+            sourceBadge.className = 'badge bg-dark-subtle text-info font-mono';
+        } else {
+            sourceWebRTCRadio.checked = true;
+            rtspConfigSection.style.display = 'none';
+            sourceBadge.textContent = 'WEBRTC';
+            sourceBadge.className = 'badge bg-dark-subtle text-emerald font-mono';
+        }
+
+        rtspUrlInput.value = currentRtspUrl;
+        rtspTransportSelect.value = currentRtspTransport;
+
         if (s.roi_zone) {
             try {
                 const parsedRoi = JSON.parse(s.roi_zone);
@@ -992,6 +1089,19 @@ async function loadSettings() {
     }
 }
 
+// Selector visual de fuente en Ajustes
+sourceWebRTCRadio.addEventListener('change', () => {
+    if (sourceWebRTCRadio.checked) {
+        rtspConfigSection.style.display = 'none';
+    }
+});
+
+sourceRTSPRadio.addEventListener('change', () => {
+    if (sourceRTSPRadio.checked) {
+        rtspConfigSection.style.display = 'block';
+    }
+});
+
 aiThresholdRange.addEventListener('input', () => {
     thresholdValueLabel.textContent = `${aiThresholdRange.value}%`;
     detectionThreshold = aiThresholdRange.value / 100;
@@ -1008,6 +1118,7 @@ retentionRange.addEventListener('input', () => {
 
 // Guardar ajustes
 btnSaveSettings.addEventListener('click', async () => {
+    const selectedSource = sourceRTSPRadio.checked ? 'rtsp' : 'webrtc';
     const payload = {
         telegram_enabled: telegramEnabledInput.checked ? 'true' : 'false',
         telegram_bot_token: telegramTokenInput.value.trim(),
@@ -1015,7 +1126,10 @@ btnSaveSettings.addEventListener('click', async () => {
         ai_threshold: (aiThresholdRange.value / 100).toString(),
         cooldown_seconds: cooldownRange.value.toString(),
         video_clips_enabled: videoClipsEnabled.checked ? 'true' : 'false',
-        retention_days: retentionRange.value.toString()
+        retention_days: retentionRange.value.toString(),
+        video_source: selectedSource,
+        rtsp_url: rtspUrlInput.value.trim(),
+        rtsp_transport: rtspTransportSelect.value
     };
 
     try {
@@ -1027,8 +1141,28 @@ btnSaveSettings.addEventListener('click', async () => {
 
         if (res.ok) {
             statRetentionInfo.textContent = `${retentionRange.value} Días`;
+            const wasSourceChanged = currentVideoSource !== selectedSource || currentRtspUrl !== payload.rtsp_url;
+            
+            currentVideoSource = selectedSource;
+            currentRtspUrl = payload.rtsp_url;
+            currentRtspTransport = payload.rtsp_transport;
+
+            if (currentVideoSource === 'rtsp') {
+                sourceBadge.textContent = 'WI-FI RTSP';
+                sourceBadge.className = 'badge bg-dark-subtle text-info font-mono';
+            } else {
+                sourceBadge.textContent = 'WEBRTC';
+                sourceBadge.className = 'badge bg-dark-subtle text-emerald font-mono';
+            }
+
             settingsModal.hide();
             alert('Ajustes guardados con éxito.');
+
+            // Si cambió la fuente y la cámara estaba activa, reiniciar con la nueva fuente
+            if (isStreaming && wasSourceChanged) {
+                stopCamera();
+                startCamera();
+            }
         }
     } catch (e) {
         alert('Error al guardar ajustes.');
@@ -1066,6 +1200,40 @@ btnTestTelegram.addEventListener('click', async () => {
     } catch (e) {
         telegramTestResult.textContent = 'Error de conexión';
         telegramTestResult.className = 'small text-danger';
+    }
+});
+
+// Probar conexión con Cámara Wi-Fi RTSP
+btnTestRtsp.addEventListener('click', async () => {
+    const url = rtspUrlInput.value.trim();
+    const transport = rtspTransportSelect.value;
+
+    if (!url) {
+        rtspTestResult.textContent = 'Ingresa una URL RTSP';
+        rtspTestResult.className = 'small text-danger';
+        return;
+    }
+
+    rtspTestResult.textContent = 'Probando señal Wi-Fi... (puede tardar 3s)';
+    rtspTestResult.className = 'small text-warning';
+
+    try {
+        const res = await fetch('/api/stream/test-rtsp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url, transport })
+        });
+        const data = await res.json();
+        if (data.success) {
+            rtspTestResult.textContent = '¡Cámara Wi-Fi detectada con éxito!';
+            rtspTestResult.className = 'small text-emerald fw-bold';
+        } else {
+            rtspTestResult.textContent = `${data.error}`;
+            rtspTestResult.className = 'small text-danger';
+        }
+    } catch (e) {
+        rtspTestResult.textContent = 'Error al probar conexión';
+        rtspTestResult.className = 'small text-danger';
     }
 });
 

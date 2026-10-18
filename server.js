@@ -9,6 +9,7 @@ const { WebSocketServer } = require('ws');
 
 const db = require('./database');
 const notifications = require('./notifications');
+const rtspBridge = require('./rtspBridge');
 
 const app = express();
 const server = http.createServer(app);
@@ -263,6 +264,48 @@ app.post('/api/cleanup', async (req, res) => {
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
+});
+
+// ==========================================
+// PUENTE RTSP AUTOMÁTICO PARA CÁMARAS WI-FI
+// ==========================================
+
+// Stream MJPEG continuo transcodificado por FFmpeg
+app.get('/api/stream/mjpeg', async (req, res) => {
+    try {
+        const settings = await db.getAllSettings();
+        // Solo se usa la URL guardada en Ajustes (nunca una enviada por la petición),
+        // así nadie puede pedirle a FFmpeg que abra archivos o URLs arbitrarias
+        const url = settings.rtsp_url;
+        const transport = settings.rtsp_transport === 'udp' ? 'udp' : 'tcp';
+
+        if (!url || !url.startsWith('rtsp://')) {
+            return res.status(400).send('No se ha configurado una URL RTSP válida (debe empezar con rtsp://).');
+        }
+
+        rtspBridge.handleClient(req, res, url, transport);
+    } catch (error) {
+        console.error('[RTSP API] Error:', error);
+        res.status(500).send('Error en el puente RTSP');
+    }
+});
+
+// Probar conexión directa con una cámara Wi-Fi
+app.post('/api/stream/test-rtsp', async (req, res) => {
+    try {
+        const { url } = req.body;
+        const transport = req.body.transport === 'udp' ? 'udp' : 'tcp';
+        const result = await rtspBridge.testConnection(url, transport);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Detener stream RTSP
+app.post('/api/stream/stop', (req, res) => {
+    rtspBridge.stop();
+    res.json({ success: true });
 });
 
 // Compatibilidad con la ruta anterior /api/captures

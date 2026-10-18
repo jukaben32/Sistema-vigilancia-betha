@@ -95,7 +95,10 @@ async function init() {
         ['retention_days', '15'],
         ['siren_sound_enabled', 'true'],
         ['video_clips_enabled', 'true'],
-        ['roi_zone', '{"enabled":false,"x":0,"y":0,"width":100,"height":100}']
+        ['roi_zone', '{"enabled":false,"x":0,"y":0,"width":100,"height":100}'],
+        ['video_source', 'webrtc'],
+        ['rtsp_url', ''],
+        ['rtsp_transport', 'tcp']
     ];
 
     for (const [k, v] of defaultSettings) {

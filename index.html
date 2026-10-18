@@ -116,6 +116,7 @@
                             <span class="camera-name font-mono">CAM_01 // ENTRADA PRINCIPAL</span>
                         </div>
                         <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-dark-subtle text-info font-mono" id="sourceBadge">WEBRTC</span>
                             <span class="badge bg-dark-subtle text-cyan font-mono" id="fpsCounter">30 FPS</span>
                             <span class="badge bg-dark-subtle text-secondary font-mono" id="resBadge">HD 720p</span>
                         </div>
@@ -124,6 +125,7 @@
                     <!-- Pantalla de Video + Canvas de HUD/IA -->
                     <div class="video-container" id="videoContainer">
                         <video id="videoElement" autoplay playsinline muted></video>
+                        <img id="rtspImageElement" style="display: none; width: 100%; height: 100%; max-height: 580px; object-fit: cover;" alt="Stream RTSP">
                         <canvas id="overlayCanvas"></canvas>
                         
                         <!-- Overlay de Estado Inicial / Inactivo -->
@@ -378,6 +380,11 @@
                                 <i class="bi bi-hdd-stack text-warning me-1"></i> Retención
                             </button>
                         </li>
+                        <li class="nav-item">
+                            <button class="nav-link text-white" data-bs-toggle="tab" data-bs-target="#tabSource">
+                                <i class="bi bi-wifi text-info me-1"></i> Cámara Wi-Fi
+                            </button>
+                        </li>
                     </ul>
 
                     <div class="tab-content">
@@ -476,6 +483,54 @@
                                 <button type="button" class="btn btn-outline-warning btn-sm" id="btnManualCleanup">
                                     <i class="bi bi-trash2 me-1"></i> Purgar Antiguos
                                 </button>
+                            </div>
+                        </div>
+
+                        <!-- TAB: FUENTE DE CÁMARA (WEBRTC vs RTSP) -->
+                        <div class="tab-pane fade" id="tabSource">
+                            <div class="mb-3">
+                                <label class="form-label small text-secondary">Tipo de Conexión de Cámara</label>
+                                <div class="d-flex flex-column gap-2">
+                                    <div class="form-check p-2 rounded bg-black border border-secondary">
+                                        <input class="form-check-input ms-0 me-2" type="radio" name="videoSourceRadio" id="sourceWebRTC" value="webrtc" checked>
+                                        <label class="form-check-label fw-semibold" for="sourceWebRTC">
+                                            <i class="bi bi-camera-video text-emerald me-1"></i> Cámara Web Local / Celular (WebRTC)
+                                        </label>
+                                        <span class="d-block small text-secondary mt-1 ps-4">Usa la webcam USB conectada o un smartphone con DroidCam/Camo.</span>
+                                    </div>
+                                    <div class="form-check p-2 rounded bg-black border border-secondary">
+                                        <input class="form-check-input ms-0 me-2" type="radio" name="videoSourceRadio" id="sourceRTSP" value="rtsp">
+                                        <label class="form-check-label fw-semibold text-info" for="sourceRTSP">
+                                            <i class="bi bi-wifi text-info me-1"></i> Cámara Wi-Fi / IP (Stream RTSP)
+                                        </label>
+                                        <span class="d-block small text-secondary mt-1 ps-4">Conexión automática a cámaras TP-Link Tapo, Reolink, Ezviz, etc.</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="rtspConfigSection" style="display: none;" class="p-3 rounded bg-black border border-secondary mb-3">
+                                <div class="mb-3">
+                                    <label class="form-label small text-secondary">URL RTSP de la Cámara</label>
+                                    <input type="text" class="form-control form-control-sm bg-dark border-secondary text-white font-mono" id="rtspUrlInput" placeholder="rtsp://admin:123456@192.168.1.50:554/stream1">
+                                    <span class="small text-secondary" style="font-size: 0.75rem;">
+                                        Ejemplos: <code>rtsp://usuario:clave@IP:554/stream1</code> (Tapo) o <code>rtsp://admin:clave@IP:554/h264Preview_01_main</code> (Reolink).
+                                    </span>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label small text-secondary">Protocolo de Transporte</label>
+                                    <select class="form-select form-select-sm bg-dark border-secondary text-white" id="rtspTransportSelect">
+                                        <option value="tcp" selected>TCP (Recomendado, mayor estabilidad sin pérdidas)</option>
+                                        <option value="udp">UDP (Menor latencia)</option>
+                                    </select>
+                                </div>
+
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <button type="button" class="btn btn-outline-info btn-sm" id="btnTestRtsp">
+                                        <i class="bi bi-broadcast me-1"></i> Probar Conexión Wi-Fi
+                                    </button>
+                                    <span class="small" id="rtspTestResult"></span>
+                                </div>
                             </div>
                         </div>
 
