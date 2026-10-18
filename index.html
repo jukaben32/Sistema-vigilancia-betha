@@ -1,99 +1,505 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Vigilancia</title>
+    <title>Betha Sentinel // Sistema de Vigilancia IA</title>
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2310b981'><path d='M12 2L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-3zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-2.33v8.02z'/></svg>">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <!-- Custom CSS -->
     <link rel="stylesheet" href="styles.css">
 </head>
-<body class="bg-light">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container">
-            <a class="navbar-brand" href="#">Sistema de Vigilancia</a>
-        </div>
-    </nav>
+<body class="cctv-body">
 
-    <div class="container mt-4">
-        <div class="row">
-            <!-- Cámara en vivo -->
-            <div class="col-lg-8">
-                <div class="card shadow">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0">Cámara en Vivo</h5>
-                    </div>
-                    <div class="card-body">
-                        <video id="videoElement" class="w-100" autoplay playsinline></video>
-                        <canvas id="canvasElement" style="display: none;"></canvas>
-                    </div>
-                    <div class="card-footer">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span id="status" class="text-muted">Estado: Iniciando...</span>
-                            <button id="toggleCamera" class="btn btn-primary">Iniciar Cámara</button>
-                        </div>
+    <!-- BARRA SUPERIOR / TOP HUD -->
+    <header class="top-hud px-4 py-2 d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-3">
+            <div class="brand-shield">
+                <i class="bi bi-shield-shaded text-emerald"></i>
+            </div>
+            <div>
+                <h1 class="brand-title mb-0">BETHA SENTINEL</h1>
+                <span class="brand-subtitle">IA NEURAL SURVEILLANCE SYSTEM</span>
+            </div>
+        </div>
+
+        <!-- Telemetría central -->
+        <div class="hud-telemetry d-none d-md-flex align-items-center gap-4">
+            <div class="telemetry-pill">
+                <span class="pulse-dot active" id="wsIndicator"></span>
+                <span id="wsStatus">EN LÍNEA</span>
+            </div>
+            <div class="telemetry-pill">
+                <i class="bi bi-cpu text-cyan"></i>
+                <span id="aiEngineStatus">IA: CARGANDO...</span>
+            </div>
+            <div class="telemetry-pill">
+                <i class="bi bi-clock-history text-secondary"></i>
+                <span id="hudClock" class="font-mono">--:--:--</span>
+            </div>
+        </div>
+
+        <!-- Acciones rápidas -->
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-outline-cyan btn-sm" id="btnToggleSound" title="Sonido de Alarma">
+                <i class="bi bi-volume-up" id="soundIcon"></i>
+            </button>
+            <button class="btn btn-outline-emerald btn-sm" data-bs-toggle="modal" data-bs-target="#settingsModal">
+                <i class="bi bi-gear-fill me-1"></i> Ajustes
+            </button>
+        </div>
+    </header>
+
+    <!-- CONTENEDOR PRINCIPAL -->
+    <main class="container-fluid px-3 px-lg-4 py-3">
+        
+        <!-- CARDS DE MÉTRICAS RÁPIDAS -->
+        <div class="row g-3 mb-3">
+            <div class="col-6 col-lg-3">
+                <div class="metric-card">
+                    <div class="metric-icon text-cyan"><i class="bi bi-person-bounding-box"></i></div>
+                    <div class="metric-data">
+                        <span class="metric-label">Personas Hoy</span>
+                        <h2 class="metric-value" id="statTodayPersons">0</h2>
                     </div>
                 </div>
             </div>
-            
-            <!-- Galería de capturas -->
-            <div class="col-lg-4">
-                <div class="card shadow">
-                    <div class="card-header bg-success text-white">
-                        <h5 class="mb-0">Últimas Capturas</h5>
+            <div class="col-6 col-lg-3">
+                <div class="metric-card">
+                    <div class="metric-icon text-emerald"><i class="bi bi-camera-video"></i></div>
+                    <div class="metric-data">
+                        <span class="metric-label">Total Eventos Hoy</span>
+                        <h2 class="metric-value" id="statTodayEvents">0</h2>
                     </div>
-                    <div class="card-body">
-                        <!-- Filtros -->
-                        <div class="mb-3">
-                            <div class="input-group">
-                                <input type="date" class="form-control" id="dateFilter">
-                                <button class="btn btn-outline-secondary" type="button" id="clearFilter">
-                                    <i class="bi bi-x-circle"></i> Limpiar
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="metric-card">
+                    <div class="metric-icon text-warning"><i class="bi bi-bell-fill"></i></div>
+                    <div class="metric-data">
+                        <span class="metric-label">Última Detección</span>
+                        <h2 class="metric-value-sm" id="statLatestAlert">Ninguna</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="metric-card">
+                    <div class="metric-icon text-danger"><i class="bi bi-hdd-network"></i></div>
+                    <div class="metric-data">
+                        <span class="metric-label">Retención Auto</span>
+                        <h2 class="metric-value-sm" id="statRetentionInfo">15 Días</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            
+            <!-- PANEL IZQUIERDO: VISOR DE CÁMARA EN VIVO Y TIMELINE -->
+            <div class="col-12 col-xl-8">
+                
+                <div class="cctv-viewport-card">
+                    <!-- Cabecera de la cámara -->
+                    <div class="viewport-header d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-danger rec-badge" id="recBadge">
+                                <span class="blink-dot"></span> LIVE
+                            </span>
+                            <span class="camera-name font-mono">CAM_01 // ENTRADA PRINCIPAL</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-dark-subtle text-cyan font-mono" id="fpsCounter">30 FPS</span>
+                            <span class="badge bg-dark-subtle text-secondary font-mono" id="resBadge">HD 720p</span>
+                        </div>
+                    </div>
+
+                    <!-- Pantalla de Video + Canvas de HUD/IA -->
+                    <div class="video-container" id="videoContainer">
+                        <video id="videoElement" autoplay playsinline muted></video>
+                        <canvas id="overlayCanvas"></canvas>
+                        
+                        <!-- Overlay de Estado Inicial / Inactivo -->
+                        <div class="video-placeholder" id="videoPlaceholder">
+                            <i class="bi bi-camera-video-off display-4 text-secondary mb-3"></i>
+                            <h5>CÁMARA EN ESPERA</h5>
+                            <p class="text-secondary small">Haz clic en "Iniciar Cámara" para comenzar la vigilancia con IA</p>
+                            <button class="btn btn-emerald btn-lg px-4" id="btnStartCameraCenter">
+                                <i class="bi bi-play-circle-fill me-2"></i> Iniciar Sistema
+                            </button>
+                        </div>
+
+                        <!-- Zona de detección ROI (Interactiva) -->
+                        <div class="roi-overlay" id="roiBox" style="display: none;">
+                            <span class="roi-label">ZONA ACTIVA DE DETECCIÓN (ROI)</span>
+                        </div>
+
+                        <!-- Banner de Alerta en Pantalla -->
+                        <div class="hud-alert-banner" id="hudAlertBanner">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            <span id="hudAlertText">¡PERSONA DETECTADA!</span>
+                        </div>
+                    </div>
+
+                    <!-- Barra de Controles Tácticos -->
+                    <div class="viewport-footer">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <button id="toggleCamera" class="btn btn-emerald">
+                                    <i class="bi bi-power me-1"></i> <span id="toggleCameraText">Iniciar Cámara</span>
+                                </button>
+                                <button id="btnToggleAI" class="btn btn-outline-cyan active" title="Activar/Desactivar IA">
+                                    <i class="bi bi-cpu me-1"></i> <span id="aiToggleText">IA: Activa</span>
+                                </button>
+                                <button id="btnToggleROI" class="btn btn-outline-secondary" title="Definir Zona ROI">
+                                    <i class="bi bi-bounding-box-circles me-1"></i> <span id="roiBtnText">Zona ROI</span>
+                                </button>
+                            </div>
+
+                            <div class="d-flex align-items-center gap-2">
+                                <button id="btnManualCapture" class="btn btn-outline-light" title="Captura Manual">
+                                    <i class="bi bi-camera me-1"></i> Capturar
+                                </button>
+                                <button id="btnFullscreen" class="btn btn-outline-light" title="Pantalla Completa">
+                                    <i class="bi bi-fullscreen"></i>
                                 </button>
                             </div>
                         </div>
-                        <div id="captureGallery" class="gallery-container">
-                            <!-- Las imágenes se cargarán aquí dinámicamente -->
+                    </div>
+                </div>
+
+                <!-- LÍNEA DE TIEMPO INTERACTIVA (TIMELINE SCRUBBER) -->
+                <div class="timeline-card mt-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-activity text-emerald"></i>
+                            <span class="small text-uppercase fw-semibold">Línea de Tiempo de Eventos (Últimas 24h)</span>
+                        </div>
+                        <span class="small text-secondary font-mono" id="timelineStats">0 eventos registrados</span>
+                    </div>
+
+                    <div class="timeline-bar-wrapper">
+                        <div class="timeline-hours-markers">
+                            <span>00:00</span>
+                            <span>04:00</span>
+                            <span>08:00</span>
+                            <span>12:00</span>
+                            <span>16:00</span>
+                            <span>20:00</span>
+                            <span>Ahora</span>
+                        </div>
+                        <div class="timeline-track" id="timelineTrack" title="Haz clic en un evento para ver los detalles">
+                            <!-- Los pines de eventos se renderizan aquí dinámicamente -->
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Modal para vista previa de imagen -->
-    <div class="modal fade" id="imagePreviewModal" tabindex="-1">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Vista Previa</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <!-- PANEL DERECHO: GALERÍA DE EVENTOS Y REGISTRO FORENSE -->
+            <div class="col-12 col-xl-4">
+                <div class="gallery-card">
+                    
+                    <!-- Encabezado con tabs y filtros -->
+                    <div class="gallery-header">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h5 class="mb-0 text-white font-mono d-flex align-items-center gap-2">
+                                <i class="bi bi-shield-check text-cyan"></i> Registro de Eventos
+                            </h5>
+                            <span class="badge bg-dark-subtle text-secondary" id="galleryCountBadge">0</span>
+                        </div>
+
+                        <!-- Filtros por tipo de evento -->
+                        <div class="event-filter-tabs btn-group w-100 mb-2">
+                            <button class="btn btn-sm btn-filter active" data-filter="all">Todos</button>
+                            <button class="btn btn-sm btn-filter" data-filter="person">Personas</button>
+                            <button class="btn btn-sm btn-filter" data-filter="starred"><i class="bi bi-star-fill text-warning"></i></button>
+                        </div>
+
+                        <!-- Filtro de fecha -->
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-dark border-secondary text-secondary">
+                                <i class="bi bi-calendar-event"></i>
+                            </span>
+                            <input type="date" class="form-control form-control-sm bg-dark text-white border-secondary" id="dateFilter">
+                            <button class="btn btn-outline-secondary" type="button" id="clearFilter" title="Limpiar fecha">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Contenedor scrollable de capturas -->
+                    <div class="gallery-body" id="captureGallery">
+                        <!-- Items se cargan dinámicamente -->
+                        <div class="text-center py-5 text-secondary">
+                            <div class="spinner-border text-emerald spinner-border-sm mb-2" role="status"></div>
+                            <p class="small mb-0">Cargando eventos del sistema...</p>
+                        </div>
+                    </div>
+
+                    <!-- Paginación -->
+                    <div class="gallery-footer d-flex justify-content-between align-items-center">
+                        <button class="btn btn-outline-secondary btn-sm" id="btnPrevPage" disabled>
+                            <i class="bi bi-chevron-left"></i>
+                        </button>
+                        <span class="small text-secondary font-mono" id="pageIndicator">Página 1 / 1</span>
+                        <button class="btn btn-outline-secondary btn-sm" id="btnNextPage" disabled>
+                            <i class="bi bi-chevron-right"></i>
+                        </button>
+                    </div>
+
                 </div>
-                <div class="modal-body text-center">
-                    <img id="previewImage" class="img-fluid" src="" alt="Preview">
-                    <div class="mt-3">
-                        <p id="imageTimestamp" class="text-muted"></p>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- ======================================================= -->
+    <!-- MODAL: VISOR FORENSE DE IMAGEN / VIDEO CLIP              -->
+    <!-- ======================================================= -->
+    <div class="modal fade" id="imagePreviewModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content bg-dark border-secondary text-white">
+                <div class="modal-header border-secondary py-2 px-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-danger" id="modalEventBadge">PERSONA</span>
+                        <h6 class="modal-title font-mono mb-0" id="modalTitle">Registro Forense</h6>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body p-0 text-center position-relative">
+                    
+                    <!-- Media switcher (Foto / Video) -->
+                    <div class="media-type-switcher position-absolute top-0 end-0 m-3 z-3">
+                        <div class="btn-group btn-group-sm shadow">
+                            <button class="btn btn-dark active" id="btnViewPhoto">
+                                <i class="bi bi-image"></i> Foto
+                            </button>
+                            <button class="btn btn-dark" id="btnViewVideo" style="display: none;">
+                                <i class="bi bi-play-circle"></i> Video Clip
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Visor de Foto -->
+                    <div id="photoViewerContainer" class="p-3">
+                        <img id="previewImage" class="img-fluid rounded border border-secondary shadow-lg" src="" alt="Captura Forense">
+                    </div>
+
+                    <!-- Visor de Video Clip -->
+                    <div id="videoViewerContainer" class="p-3" style="display: none;">
+                        <video id="previewVideo" class="img-fluid rounded border border-secondary shadow-lg" controls playsinline>
+                            Tu navegador no soporta reproducción de video WebM.
+                        </video>
+                    </div>
+
+                    <!-- Panel de Metadatos Forenses -->
+                    <div class="forensic-meta px-4 py-2 text-start border-top border-secondary bg-black-subtle">
+                        <div class="row g-2 font-mono small">
+                            <div class="col-6 col-md-3">
+                                <span class="text-secondary d-block">HORA EXACTA:</span>
+                                <span class="text-white" id="imageTimestamp">--</span>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <span class="text-secondary d-block">CONFIANZA IA:</span>
+                                <span class="text-cyan fw-bold" id="modalConfidence">--</span>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <span class="text-secondary d-block">DISPOSITIVO:</span>
+                                <span class="text-white">CÁMARA 01</span>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <span class="text-secondary d-block">ESTADO:</span>
+                                <span class="text-emerald" id="modalProtectedStatus">NORMAL</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer border-secondary py-2 px-3 d-flex justify-content-between">
+                    <div>
+                        <button type="button" class="btn btn-outline-warning btn-sm" id="btnModalStar" title="Proteger de borrado">
+                            <i class="bi bi-star me-1" id="starIcon"></i> <span id="starText">Proteger</span>
+                        </button>
+                        <button type="button" class="btn btn-outline-danger btn-sm" id="btnModalDelete" title="Eliminar captura">
+                            <i class="bi bi-trash3 me-1"></i> Eliminar
+                        </button>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-light btn-sm" data-bs-dismiss="modal">Cerrar</button>
+                        <button type="button" class="btn btn-emerald btn-sm" id="downloadImage">
+                            <i class="bi bi-download me-1"></i> Descargar
+                        </button>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-                    <button type="button" class="btn btn-primary" id="downloadImage">
-                        <i class="bi bi-download"></i> Descargar
-                    </button>
-                    <button type="button" class="btn btn-success" id="shareImage">
-                        <i class="bi bi-share"></i> Compartir
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================= -->
+    <!-- MODAL: CENTRO DE AJUSTES Y CONFIGURACIÓN DEL SISTEMA    -->
+    <!-- ======================================================= -->
+    <div class="modal fade" id="settingsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-dark border-secondary text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title font-mono d-flex align-items-center gap-2">
+                        <i class="bi bi-sliders text-emerald"></i> Configuración de Betha Sentinel
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+                    
+                    <!-- Pestañas de Ajustes -->
+                    <ul class="nav nav-tabs nav-fill mb-3 border-secondary" id="settingsTabs" role="tablist">
+                        <li class="nav-item">
+                            <button class="nav-link active text-white" data-bs-toggle="tab" data-bs-target="#tabTelegram">
+                                <i class="bi bi-telegram text-cyan me-1"></i> Telegram
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link text-white" data-bs-toggle="tab" data-bs-target="#tabAI">
+                                <i class="bi bi-cpu text-emerald me-1"></i> Parámetros IA
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link text-white" data-bs-toggle="tab" data-bs-target="#tabStorage">
+                                <i class="bi bi-hdd-stack text-warning me-1"></i> Retención
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content">
+                        
+                        <!-- TAB: TELEGRAM BOT -->
+                        <div class="tab-pane fade show active" id="tabTelegram">
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="telegramEnabled">
+                                <label class="form-check-label fw-semibold" for="telegramEnabled">
+                                    Activar Alertas por Telegram Bot
+                                </label>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label small text-secondary">Token del Bot (de @BotFather)</label>
+                                <input type="text" class="form-control form-control-sm bg-black border-secondary text-white font-mono" id="telegramToken" placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ">
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label small text-secondary">Chat ID (de @userinfobot)</label>
+                                <input type="text" class="form-control form-control-sm bg-black border-secondary text-white font-mono" id="telegramChatId" placeholder="123456789">
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center">
+                                <button type="button" class="btn btn-outline-cyan btn-sm" id="btnTestTelegram">
+                                    <i class="bi bi-send me-1"></i> Probar Envío
+                                </button>
+                                <span class="small" id="telegramTestResult"></span>
+                            </div>
+                        </div>
+
+                        <!-- TAB: PARÁMETROS DE INTELIGENCIA ARTIFICIAL -->
+                        <div class="tab-pane fade" id="tabAI">
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between">
+                                    <label class="form-label small text-secondary">Umbral de Confianza de Detección</label>
+                                    <span class="small font-mono text-cyan" id="thresholdValueLabel">65%</span>
+                                </div>
+                                <input type="range" class="form-range" min="40" max="95" step="5" value="65" id="aiThresholdRange">
+                                <div class="d-flex justify-content-between text-secondary" style="font-size: 0.7rem;">
+                                    <span>Más sensible (40%)</span>
+                                    <span>Equilibrado (65%)</span>
+                                    <span>Muy estricto (95%)</span>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between">
+                                    <label class="form-label small text-secondary">Cooldown Anti-Spam (Segundos entre alertas)</label>
+                                    <span class="small font-mono text-cyan" id="cooldownValueLabel">8s</span>
+                                </div>
+                                <input type="range" class="form-range" min="3" max="30" step="1" value="8" id="cooldownRange">
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label small text-secondary">Objetos a Detectar</label>
+                                <div class="d-flex flex-wrap gap-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="classPerson" checked>
+                                        <label class="form-check-label small" for="classPerson">Personas</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="classCar" checked>
+                                        <label class="form-check-label small" for="classCar">Vehículos</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="classAnimals" checked>
+                                        <label class="form-check-label small" for="classAnimals">Mascotas</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="videoClipsEnabled" checked>
+                                <label class="form-check-label small" for="videoClipsEnabled">
+                                    Grabar Video Clip WebM además de Foto
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- TAB: RETENCIÓN Y ALMACENAMIENTO -->
+                        <div class="tab-pane fade" id="tabStorage">
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between">
+                                    <label class="form-label small text-secondary">Días de Retención Automática</label>
+                                    <span class="small font-mono text-warning" id="retentionValueLabel">15 días</span>
+                                </div>
+                                <input type="range" class="form-range" min="3" max="60" step="1" value="15" id="retentionRange">
+                                <p class="text-secondary small mt-1" style="font-size: 0.75rem;">
+                                    Los eventos con más de este tiempo se purgarán automáticamente cada 6 horas para ahorrar espacio en disco. Los eventos marcados con estrella (<i class="bi bi-star-fill text-warning"></i>) nunca se eliminan.
+                                </p>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top border-secondary">
+                                <span class="small text-secondary">Limpieza manual ahora:</span>
+                                <button type="button" class="btn btn-outline-warning btn-sm" id="btnManualCleanup">
+                                    <i class="bi bi-trash2 me-1"></i> Purgar Antiguos
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-emerald btn-sm" id="btnSaveSettings">
+                        <i class="bi bi-check-circle-fill me-1"></i> Guardar Ajustes
                     </button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Bootstrap 5 JS Bundle -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <!-- Custom JS -->
+    <!-- Dependencias de Scripts -->
+    <!-- Bootstrap 5 Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- TensorFlow.js y COCO-SSD -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+    <!-- Aplicación Principal -->
     <script src="app.js"></script>
 </body>
-</html> 
+</html>

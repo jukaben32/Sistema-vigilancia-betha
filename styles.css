@@ -1,117 +1,578 @@
-/* Estilos generales */
-body {
+/* ==========================================================================
+   BETHA SENTINEL // CYBERNETIC SURVEILLANCE STYLESHEET
+   ========================================================================== */
+
+:root {
+    --bg-main: #06090f;
+    --bg-card: #0c121e;
+    --bg-card-subtle: #111a2d;
+    --bg-glass: rgba(12, 18, 30, 0.85);
+    --border-color: #1e293b;
+    --border-highlight: #334155;
+    
+    --color-emerald: #10b981;
+    --color-emerald-glow: rgba(16, 185, 129, 0.35);
+    --color-cyan: #06b6d4;
+    --color-cyan-glow: rgba(6, 182, 212, 0.35);
+    --color-danger: #ef4444;
+    --color-danger-glow: rgba(239, 68, 68, 0.4);
+    --color-warning: #f59e0b;
+    --color-text-main: #f8fafc;
+    --color-text-muted: #94a3b8;
+}
+
+body.cctv-body {
+    background-color: var(--bg-main);
+    color: var(--color-text-main);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     min-height: 100vh;
+    overflow-x: hidden;
 }
 
-/* Estilos para la cámara */
-#videoElement {
-    border-radius: 8px;
-    background-color: #000;
-    min-height: 400px;
+.font-mono {
+    font-family: 'JetBrains Mono', monospace;
 }
 
-/* Estilos para la galería */
-.gallery-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+.text-emerald { color: var(--color-emerald) !important; }
+.text-cyan { color: var(--color-cyan) !important; }
+
+/* Botones con estilo táctico */
+.btn-emerald {
+    background-color: var(--color-emerald);
+    color: #052e16;
+    font-weight: 600;
+    border: none;
+    box-shadow: 0 0 15px var(--color-emerald-glow);
+    transition: all 0.2s ease;
+}
+.btn-emerald:hover {
+    background-color: #34d399;
+    color: #022c22;
+    box-shadow: 0 0 25px rgba(16, 185, 129, 0.6);
+}
+
+.btn-outline-emerald {
+    border-color: var(--color-emerald);
+    color: var(--color-emerald);
+}
+.btn-outline-emerald:hover {
+    background-color: var(--color-emerald);
+    color: #052e16;
+    box-shadow: 0 0 15px var(--color-emerald-glow);
+}
+
+.btn-outline-cyan {
+    border-color: var(--color-cyan);
+    color: var(--color-cyan);
+}
+.btn-outline-cyan:hover, .btn-outline-cyan.active {
+    background-color: var(--color-cyan);
+    color: #083344;
+    box-shadow: 0 0 15px var(--color-cyan-glow);
+}
+
+/* ==========================================================================
+   TOP BAR / HUD
+   ========================================================================== */
+.top-hud {
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    backdrop-filter: blur(8px);
+}
+
+.brand-shield i {
+    font-size: 1.8rem;
+    filter: drop-shadow(0 0 8px var(--color-emerald-glow));
+}
+
+.brand-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 1.15rem;
+    letter-spacing: 0.1em;
+    color: var(--color-text-main);
+}
+
+.brand-subtitle {
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    color: var(--color-text-muted);
+    font-weight: 600;
+}
+
+.hud-telemetry .telemetry-pill {
+    background: #090e18;
+    border: 1px solid var(--border-color);
+    padding: 0.3rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #64748b;
+}
+
+.pulse-dot.active {
+    background-color: var(--color-emerald);
+    box-shadow: 0 0 8px var(--color-emerald);
+    animation: pulse 1.8s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+/* ==========================================================================
+   METRIC CARDS
+   ========================================================================== */
+.metric-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1rem;
+    display: flex;
+    align-items: center;
     gap: 1rem;
-    max-height: 600px;
-    overflow-y: auto;
+    transition: transform 0.2s, border-color 0.2s;
 }
 
-.capture-item {
-    position: relative;
-    border-radius: 8px;
+.metric-card:hover {
+    border-color: var(--border-highlight);
+    transform: translateY(-2px);
+}
+
+.metric-icon {
+    font-size: 1.8rem;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 0.5rem 0.8rem;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.metric-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-muted);
+    display: block;
+}
+
+.metric-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 1.6rem;
+    margin-bottom: 0;
+    color: #fff;
+}
+
+.metric-value-sm {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin-bottom: 0;
+    color: #e2e8f0;
+}
+
+/* ==========================================================================
+   VIEWPORT CÁMARA & HUD
+   ========================================================================== */
+.cctv-viewport-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
     overflow: hidden;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    transition: transform 0.2s;
-    cursor: pointer;
 }
 
-.capture-item:hover {
-    transform: scale(1.05);
+.viewport-header {
+    background: #090f19;
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--border-color);
 }
 
-.capture-item img {
+.camera-name {
+    font-size: 0.8rem;
+    color: #cbd5e1;
+    letter-spacing: 0.05em;
+}
+
+.rec-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+}
+
+.blink-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    background-color: white;
+    border-radius: 50%;
+    margin-right: 4px;
+    animation: blink 1s infinite alternate;
+}
+
+@keyframes blink {
+    from { opacity: 1; }
+    to { opacity: 0.2; }
+}
+
+.video-container {
+    position: relative;
     width: 100%;
-    height: 150px;
+    min-height: 480px;
+    background-color: #03060a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+#videoElement {
+    width: 100%;
+    height: 100%;
+    max-height: 580px;
+    object-fit: cover;
+    display: block;
+}
+
+#overlayCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+}
+
+/* Overlay Placeholder */
+.video-placeholder {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at center, #0e1726 0%, #030712 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    text-align: center;
+    padding: 2rem;
+}
+
+/* Banner de Alerta en Video */
+.hud-alert-banner {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    background: rgba(220, 38, 38, 0.9);
+    border: 1px solid #f87171;
+    color: #fff;
+    padding: 0.5rem 1.4rem;
+    border-radius: 30px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.8);
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 50;
+}
+
+.hud-alert-banner.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* Zona ROI de Detección */
+.roi-overlay {
+    position: absolute;
+    border: 2px dashed var(--color-cyan);
+    background: rgba(6, 182, 212, 0.12);
+    box-shadow: 0 0 15px rgba(6, 182, 212, 0.25);
+    z-index: 15;
+    cursor: move;
+}
+
+.roi-label {
+    position: absolute;
+    top: -22px;
+    left: 0;
+    background: var(--color-cyan);
+    color: #042f2e;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.viewport-footer {
+    background: #090f19;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+/* ==========================================================================
+   LÍNEA DE TIEMPO INTERACTIVA (TIMELINE SCRUBBER)
+   ========================================================================== */
+.timeline-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1rem;
+}
+
+.timeline-bar-wrapper {
+    position: relative;
+    padding-top: 1rem;
+}
+
+.timeline-hours-markers {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--color-text-muted);
+    margin-bottom: 0.3rem;
+}
+
+.timeline-track {
+    position: relative;
+    height: 16px;
+    background: #060910;
+    border-radius: 8px;
+    border: 1px solid #1e293b;
+    cursor: pointer;
+    overflow: hidden;
+}
+
+.timeline-pin {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    border-radius: 3px;
+    background-color: var(--color-danger);
+    box-shadow: 0 0 6px var(--color-danger);
+    transition: transform 0.15s;
+}
+
+.timeline-pin:hover {
+    transform: scaleX(2.5);
+    z-index: 10;
+}
+
+.timeline-pin.type-motion {
+    background-color: var(--color-warning);
+    box-shadow: 0 0 6px var(--color-warning);
+}
+
+/* ==========================================================================
+   GALERÍA DE EVENTOS (PANEL LATERAL)
+   ========================================================================== */
+.gallery-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 600px;
+}
+
+.gallery-header {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    background: #090f19;
+}
+
+.btn-filter {
+    background: #0b111e;
+    color: var(--color-text-muted);
+    border: 1px solid var(--border-color);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+.btn-filter:hover {
+    background: #131c2e;
+    color: #fff;
+}
+.btn-filter.active {
+    background: var(--color-cyan);
+    color: #042f2e;
+    border-color: var(--color-cyan);
+    font-weight: 600;
+}
+
+.gallery-body {
+    flex: 1;
+    max-height: 520px;
+    overflow-y: auto;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+/* Scrollbar de alta definición */
+.gallery-body::-webkit-scrollbar {
+    width: 6px;
+}
+.gallery-body::-webkit-scrollbar-track {
+    background: #080d16;
+}
+.gallery-body::-webkit-scrollbar-thumb {
+    background: #1e293b;
+    border-radius: 4px;
+}
+.gallery-body::-webkit-scrollbar-thumb:hover {
+    background: #334155;
+}
+
+/* Item de Captura / Card Forense */
+.capture-card {
+    background: #090e18;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.capture-card:hover {
+    border-color: var(--color-cyan);
+    background: #0d1524;
+    transform: translateX(3px);
+}
+
+.capture-thumb-box {
+    position: relative;
+    width: 105px;
+    height: 70px;
+    border-radius: 6px;
+    overflow: hidden;
+    flex-shrink: 0;
+    background: #000;
+}
+
+.capture-thumb {
+    width: 100%;
+    height: 100%;
     object-fit: cover;
 }
 
-.capture-info {
+.video-indicator-badge {
     position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: rgba(0,0,0,0.7);
-    color: white;
-    padding: 0.5rem;
+    bottom: 4px;
+    right: 4px;
+    background: rgba(0, 0, 0, 0.75);
+    color: #fff;
+    font-size: 0.6rem;
+    padding: 1px 4px;
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.capture-details {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.capture-event-title {
+    font-family: 'JetBrains Mono', monospace;
     font-size: 0.8rem;
-    text-align: center;
+    font-weight: 700;
+    margin-bottom: 2px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
-/* Estilos para el estado de la cámara */
-.camera-active {
-    color: #28a745 !important;
+.capture-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
 }
 
-.camera-inactive {
-    color: #dc3545 !important;
+.star-btn-card {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: transparent;
+    border: none;
+    color: #475569;
+    font-size: 0.9rem;
+    padding: 2px 4px;
+    transition: color 0.2s;
+}
+.star-btn-card:hover, .star-btn-card.starred {
+    color: var(--color-warning);
 }
 
-/* Scrollbar personalizado */
-.gallery-container::-webkit-scrollbar {
-    width: 8px;
+.gallery-footer {
+    padding: 0.6rem 1rem;
+    border-top: 1px solid var(--border-color);
+    background: #090f19;
 }
 
-.gallery-container::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 4px;
+/* ==========================================================================
+   MODALES Y REPRODUCTOR FORENSE
+   ========================================================================== */
+#imagePreviewModal .modal-content, #settingsModal .modal-content {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+    border-radius: 14px;
 }
 
-.gallery-container::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 4px;
-}
-
-.gallery-container::-webkit-scrollbar-thumb:hover {
-    background: #555;
-}
-
-/* Estilos para el modal */
-.modal-body img {
-    max-height: 70vh;
+#previewImage, #previewVideo {
+    max-height: 60vh;
     width: auto;
     max-width: 100%;
 }
 
-#imagePreviewModal .modal-content {
-    background-color: #fff;
-    border-radius: 12px;
+.media-type-switcher .btn {
+    border: 1px solid #334155;
 }
-
-#imagePreviewModal .modal-header {
-    border-bottom: 1px solid #dee2e6;
-    padding: 1rem;
-}
-
-#imagePreviewModal .modal-footer {
-    border-top: 1px solid #dee2e6;
-    padding: 1rem;
-}
-
-/* Estilos para los filtros */
-.input-group .form-control:focus {
-    border-color: #80bdff;
-    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+.media-type-switcher .btn.active {
+    background-color: var(--color-emerald);
+    color: #022c22;
+    border-color: var(--color-emerald);
+    font-weight: 600;
 }
 
 /* Animaciones */
-.capture-item {
-    animation: fadeIn 0.3s ease-in;
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-} 
+.capture-card {
+    animation: fadeIn 0.25s ease-out;
+}
