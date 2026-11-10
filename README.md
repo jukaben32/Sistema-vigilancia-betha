@@ -1,121 +1,125 @@
-# 🛡️ BETHA SENTINEL // Sistema de Vigilancia IA (v2.0)
+# 🛡️ BETHA SENTINEL v3 — Vigilancia IA 24/7
 
-Sistema de vigilancia web inteligente de grado profesional impulsado por **Redes Neuronales (TensorFlow.js / COCO-SSD)** en tiempo real, clips de video en búfer, base de datos SQLite indexada, alertas fotográficas instantáneas por **Telegram Bot** y un **Dashboard CCTV Cyberpunk** de alta tecnología.
+Sistema de videovigilancia que corre en tu propio PC. La **IA analiza las cámaras en el servidor**, así que sigue vigilando aunque cierres el navegador. Graba clips con los segundos **anteriores** a la detección, avisa por **Telegram** y se controla desde el móvil, también fuera de casa.
 
----
+## Qué hace
 
-## ⚡ Nuevas Características (v2.0)
+| | |
+|---|---|
+| 🧠 **IA en el servidor** | YOLOX-Nano/Tiny (ONNX Runtime, CPU). Detecta personas, vehículos y animales. Pide 2 frames seguidos para confirmar, lo que reduce las falsas alarmas. |
+| 📹 **Multi-cámara** | Webcam USB/integrada (DirectShow) y cámaras Wi-Fi/IP por RTSP (Tapo, Reolink, Ezviz…). Hasta 8. |
+| 🎬 **Clips con pre-evento** | Búfer continuo de segmentos: cada clip MP4 incluye los N segundos de antes y se alarga mientras dura la detección. |
+| 🛡️ **Modos y horarios** | Armado (graba y alerta) · En casa (graba sin alertas) · Desarmado. Horarios semanales automáticos. |
+| 🤖 **Bot de Telegram** | Alertas con foto y después el clip. Botones "Desarmar 1 h" / "Ver clip". Comandos `/estado` `/foto` `/armar` `/encasa` `/desarmar` `/clip`. |
+| 🎯 **Zona ROI por cámara** | Se dibuja arrastrando sobre el vídeo; se ignora lo que queda fuera. |
+| 💾 **SQLite + retención** | Purga por días y por espacio máximo en disco. Los eventos protegidos con ⭐ nunca se borran. |
+| 🔒 **Seguro por defecto** | Login con contraseña (scrypt), sesiones HttpOnly, anti-CSRF, cabeceras CSP. Solo escucha en este PC salvo que tú lo cambies. |
 
-### 1. 🧠 Visión por Computadora e Inteligencia Artificial
-* **Detección de Objetos en Tiempo Real**: Utiliza el modelo neural **COCO-SSD** acelerado por WebGL directamente en el navegador.
-* **Eliminación Total de Falsos Positivos**: Ya no se detecta ruido por simples cambios de luz o sombras; el sistema clasifica de forma certera **Personas**, **Vehículos** y **Mascotas**.
-* **Bounding Boxes Tácticos en Vivo**: Resalta visualmente al sujeto detectado con cuadros de borde cian/esmeralda y el porcentaje exacto de confianza (ej. `👤 PERSONA 94%`).
-* **Zona de Vigilancia ROI (Region of Interest)**: Puedes definir y dibujar un cuadrante de vigilancia en pantalla para ignorar áreas fuera de interés (como calles transitadas o ventanas).
+## Requisitos
 
-### 2. 📹 Grabación de Video Clips + Fotos en Alta Resolución
-* **Grabación de Video Clips WebM**: Cuando se detecta un intruso, no solo captura una foto con la caja delimitadora; graba automáticamente un clip de video de 6 a 10 segundos.
-* **Visor Forense Integrado**: Modal interactivo que permite alternar con un solo clic entre la foto HD y la reproducción del video clip capturado.
-* **Cooldown Anti-Spam Inteligente**: Evita saturar el disco con cientos de fotos si una persona permanece caminando en el encuadre (tiempo configurable entre 5s y 30s).
+- **Windows 10/11** (las webcams usan DirectShow; con RTSP también funciona en Linux/macOS)
+- **Node.js 20 o superior**
+- FFmpeg **no hace falta instalarlo**: viene incluido (`ffmpeg-static`). Si tienes uno en el PATH, se usa ese.
 
-### 3. 💾 Base de Datos SQLite Indexada & Purga Automática
-* **Indexación Instantánea**: Sustituye la lectura manual de carpetas en disco por una base de datos **SQLite** optimizada (`data/vigilancia.sqlite`).
-* **Paginación y Filtros Rápidos**: Búsqueda instantánea por fecha, categoría de detección y eventos destacados.
-* **Línea de Tiempo Interactiva (24h Scrubber)**: Barra visual que marca todos los eventos del día con pines interactivos para saltar a cualquier momento con un clic.
-* **Política de Retención Automática**: Programador automático que purga grabaciones con más de *N* días (configurable de 3 a 60 días).
-* **Protección de Evidencia (Favoritos / Estrella)**: Puedes marcar cualquier captura con una estrella (<i class="bi bi-star-fill text-warning"></i>) para evitar que la purga automática la elimine jamás.
+## Instalación
 
-### 4. 🚨 Alertas Instantáneas en Telegram Bot & Alarma Sonora
-* **Notificaciones con Foto en Telegram**: Cada vez que se detecta a una persona, el servidor envía una alerta a tu móvil con la foto adjunta, fecha y porcentaje de confianza.
-* **WebSockets Bidireccionales**: El panel de control se actualiza en tiempo real sin recargar la página cuando se detecta un evento.
-* **Sirena Sonora Disuasoria**: Alarma acústica sintetizada en el navegador (Web Audio API) que avisa instantáneamente ante cualquier intrusión.
-
----
-
-## 🚀 Requisitos e Instalación
-
-### Requisitos:
-* **Node.js** (versión 18 o superior, probado en Node 24)
-* **Navegador web moderno** (Chrome, Edge, Firefox, Brave, Safari) con soporte WebRTC y cámara web.
-
-### Instalación:
-
-1. Ingresa a la carpeta del proyecto:
 ```bash
-cd "Sistema-vigilancia-betha"
-```
-
-2. Instala las dependencias:
-```bash
-npm install
-```
-
-3. Inicia el servidor:
-```bash
+cd Sistema-vigilancia-betha
+npm install          # instala dependencias y descarga el modelo YOLOX-Nano (3,5 MB)
 npm start
 ```
-*(Para desarrollo con auto-reload puedes usar `npm run dev`)*.
 
-4. Abre tu navegador en:
+1. Abre **http://localhost:3000** en ese mismo PC y crea la contraseña de administrador.
+2. **Ajustes → Cámaras → Añadir cámara**: elige la webcam o pega la URL RTSP y pulsa *Probar*.
+3. Listo: la vigilancia funciona aunque cierres el navegador.
+
+> Si `npm install` no pudo descargar el modelo (sin internet), ejecuta `npm run model:download` más tarde.
+
+### URLs RTSP habituales
+
+| Marca | URL |
+|---|---|
+| TP-Link Tapo | `rtsp://usuario:clave@IP:554/stream1` (activa "Cuenta de cámara" en la app Tapo) |
+| Reolink | `rtsp://admin:clave@IP:554/h264Preview_01_main` |
+| Ezviz / Hikvision | `rtsp://admin:CÓDIGO@IP:554/H.264` |
+
+## Telegram
+
+1. En Telegram, habla con **@BotFather** → `/newbot` → copia el token.
+2. Habla con **@userinfobot** para saber tu Chat ID.
+3. Abre tu bot y pulsa **Iniciar**.
+4. En el panel: **Ajustes → Alertas**. Pega el token y el Chat ID, pulsa *Probar envío* y luego *Guardar*.
+
+El bot funciona por *long polling*: **no hace falta abrir puertos**. Solo obedece al Chat ID configurado.
+
+## Acceso desde fuera de casa (seguro)
+
+**No abras puertos en el router.** Usa una de estas opciones:
+
+**Tailscale (recomendado, gratis)**
+1. Instala Tailscale en el PC y en el móvil, con la misma cuenta.
+2. En `.env` pon `HOST=0.0.0.0` y reinicia.
+3. Desde el móvil abre `http://<IP-Tailscale-del-PC>:3000`. Solo tus dispositivos pueden llegar.
+4. Fuera de casa, pulsa **Alta → Baja** en el panel para gastar menos datos.
+
+**Cloudflare Tunnel** (si quieres una URL https pública)
+`cloudflared tunnel --url http://localhost:3000`, deja `HOST=127.0.0.1` y pon `TRUST_PROXY=true`. El login protege el panel.
+
+> La contraseña inicial solo se puede crear desde el propio PC (o con `ADMIN_PASSWORD` en `.env`). Así nadie puede "reclamar" un servidor recién expuesto.
+
+## Funcionamiento 24/7
+
+```bash
+npm install -g pm2
+pm2 start ecosystem.config.js
+pm2 save
 ```
-http://localhost:3000
-```
 
-5. Otorga permiso a la cámara y haz clic en **"Iniciar Sistema"**.
+Para que arranque al encender Windows: crea una tarea en el **Programador de tareas** con el disparador *Al iniciar sesión* y la acción `pm2 resurrect`. Otra opción es `npm install -g pm2-windows-startup && pm2-startup install`.
 
----
+Configura también Windows para que **no suspenda** el equipo (Configuración → Sistema → Energía).
 
-## 📲 Configuración del Bot de Telegram (Alertas Móviles)
+## Rendimiento (medido en un Intel i3-6100U)
 
-El sistema incluye integración nativa con Telegram para avisos en tiempo real:
+| | |
+|---|---|
+| Inferencia YOLOX-Nano | ~35–45 ms por frame |
+| 1 webcam 720p, 4 análisis/s, grabación activa | ~7 % CPU Node + ~10–18 % FFmpeg |
+| Cámaras RTSP | La grabación copia el vídeo sin recodificar (casi 0 % CPU extra) |
 
-1. Abre Telegram y busca a **`@BotFather`**.
-2. Envía el comando `/newbot` y sigue las instrucciones para crear tu bot. Al finalizar, copia el **HTTP API Token** (ej. `123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ`).
-3. Busca al bot **`@userinfobot`** en Telegram y pulsa Iniciar para conocer tu **ID numérico** (ej. `987654321`).
-4. Abre tu bot recién creado y pulsa **Iniciar / Start** para permitirle enviarte mensajes.
-5. En el panel de Betha Sentinel, haz clic en **Ajustes** (<i class="bi bi-gear-fill"></i>):
-   - Activa el interruptor **"Activar Alertas por Telegram Bot"**.
-   - Pega tu **Token** y tu **Chat ID**.
-   - Haz clic en **"Probar Envío"** para comprobar la conexión.
-   - Pulsa **"Guardar Ajustes"**.
+Si tienes varias cámaras y el CPU va justo, baja *Análisis por segundo* en **Ajustes → IA**. YOLOX-Tiny es más preciso, pero gasta unas 3 veces más.
 
----
-
-## 📁 Estructura del Proyecto
+## Estructura
 
 ```
-Sistema-vigilancia-betha/
-├── index.html          # Dashboard CCTV con estética Cyberpunk / Dark Ops
-├── styles.css          # Estilos modernos con CSS variables, glow y HUD táctico
-├── app.js             # Motor neural TensorFlow.js, WebSockets, grabador y controles
-├── server.js          # Servidor Express, WebSocket Server, Multer y API REST
-├── database.js        # Módulo SQLite con índices, estadísticas y retención
-├── notifications.js   # Notificaciones multicanal (Telegram Bot API con fotos)
-├── data/              # Base de datos SQLite (vigilancia.sqlite)
-├── captures/          # Capturas organizadas por YYYY/MM/DD/ (fotos y clips WebM)
-├── .env.example       # Plantilla de variables de entorno
-└── package.json       # Dependencias y scripts del proyecto
+server.js               Arranque (Express, seguridad, apagado ordenado)
+src/
+  config.js             Variables de entorno
+  auth.js               Contraseña scrypt, sesiones, límite de intentos, anti-CSRF
+  settings.js / store.js Esquema validado de ajustes + caché
+  schedule.js / mode.js Modos Armado/En casa/Desarmado y horarios
+  core.js               Detección → evento → foto → clip → alertas
+  retention.js          Purga por días, por espacio y de archivos huérfanos
+  ws.js                 WebSocket autenticado
+  db/                   SQLite (WAL) + migraciones versionadas
+  ai/                   Detector ONNX, post-proceso YOLOX, motor de eventos
+  cameras/              FFmpeg por cámara, reinicio automático, búfer y clips
+  alerts/               Telegram (alertas + bot de comandos) y WhatsApp
+  routes/               API REST
+public/                 Panel web (único directorio servido)
+scripts/                Descarga y verificación del modelo
+test/                   Pruebas (npm test) y prueba completa sin cámara (npm run test:e2e)
 ```
 
----
+## Pruebas
 
-## 🔒 Privacidad y Seguridad
-* Todas las grabaciones y la base de datos residen localmente en tu propio equipo.
-* Ningún fotograma de video se envía a servidores de terceros para procesamiento; la IA se ejecuta en local mediante aceleración WebGL.
-* Los tokens de bot y credenciales se guardan localmente en SQLite y `.env`.
+```bash
+npm test           # unitarias: horarios, motor de eventos, YOLOX, seguridad
+npm run test:e2e   # extremo a extremo con una imagen de prueba (no usa tu webcam)
+```
 
----
+## Créditos y licencias
 
-© 2026 Betha Sentinel Security Hub. Licencia MIT.
-
----
-
-## 📶 Cámaras Wi-Fi / IP (RTSP) — v2.1
-
-Además de la webcam, puedes usar una cámara Wi-Fi (Tapo, Reolink, Ezviz...).
-
-1. Instala **FFmpeg** y comprueba que `ffmpeg -version` funciona en la terminal.
-2. En el panel: **Ajustes > Fuente de cámara > Cámara Wi-Fi / IP**.
-3. Escribe la URL, por ejemplo `rtsp://usuario:clave@192.168.1.50:554/stream1`, y pulsa **Probar conexión**.
-4. Guarda e inicia la cámara. El servidor convierte el RTSP a MJPEG y la IA detecta igual que con la webcam.
-
-> La URL (con su clave) se guarda en la base de datos local. No expongas este servidor a internet sin protegerlo.
+- Modelos **YOLOX** de Megvii — Apache-2.0 (descargados desde los releases oficiales, con verificación SHA-256).
+- `test/fixtures/dog.jpg` procede del repositorio de YOLOX (Apache-2.0).
+- Este proyecto: MIT.

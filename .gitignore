@@ -1,8 +1,12 @@
 node_modules/
 .env
 captures/
+data/
+models/
 *.sqlite
 *.sqlite3
+*.sqlite-wal
+*.sqlite-shm
 *.log
 .DS_Store
 Thumbs.db

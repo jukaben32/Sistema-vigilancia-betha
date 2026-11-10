@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <title>Betha Sentinel // Vigilancia IA 24/7</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2310b981'><path d='M12 2L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-3z'/></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="cctv-body">
+
+    <!-- BARRA SUPERIOR -->
+    <header class="top-hud px-3 px-lg-4 py-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="d-flex align-items-center gap-3">
+            <div class="brand-shield"><i class="bi bi-shield-shaded text-emerald"></i></div>
+            <div>
+                <h1 class="brand-title mb-0">BETHA SENTINEL</h1>
+                <span class="brand-subtitle">VIGILANCIA IA 24/7</span>
+            </div>
+        </div>
+
+        <div class="hud-telemetry d-none d-lg-flex align-items-center gap-3">
+            <div class="telemetry-pill" title="Conexión en tiempo real con el servidor">
+                <span class="pulse-dot" id="wsIndicator"></span>
+                <span id="wsStatus">CONECTANDO…</span>
+            </div>
+            <div class="telemetry-pill" title="Motor de IA en el servidor">
+                <i class="bi bi-cpu text-cyan"></i>
+                <span id="aiEngineStatus">IA: —</span>
+            </div>
+            <div class="telemetry-pill">
+                <i class="bi bi-clock-history text-secondary"></i>
+                <span id="hudClock" class="font-mono">--:--:--</span>
+            </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <div class="btn-group btn-group-sm mode-switch" role="group" aria-label="Modo de vigilancia">
+                <button class="btn btn-mode" data-mode="armed" title="Graba y envía alertas"><i class="bi bi-shield-fill-check"></i><span class="d-none d-sm-inline ms-1">Armado</span></button>
+                <button class="btn btn-mode" data-mode="home" title="Graba sin alertas ni sirena"><i class="bi bi-house-fill"></i><span class="d-none d-sm-inline ms-1">En casa</span></button>
+                <button class="btn btn-mode" data-mode="disarmed" title="No registra eventos"><i class="bi bi-shield-slash"></i><span class="d-none d-sm-inline ms-1">Desarmado</span></button>
+            </div>
+            <button class="btn btn-outline-cyan btn-sm" id="btnToggleSound" title="Sirena en este navegador">
+                <i class="bi bi-volume-up" id="soundIcon"></i>
+            </button>
+            <button class="btn btn-outline-emerald btn-sm" id="btnOpenSettings" title="Ajustes">
+                <i class="bi bi-gear-fill"></i><span class="d-none d-md-inline ms-1">Ajustes</span>
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" id="btnLogout" title="Cerrar sesión">
+                <i class="bi bi-box-arrow-right"></i>
+            </button>
+        </div>
+    </header>
+    <div class="mode-hint small text-center font-mono" id="modeHint"></div>
+
+    <main class="container-fluid px-3 px-lg-4 py-3">
+
+        <!-- MÉTRICAS -->
+        <div class="row g-3 mb-3">
+            <div class="col-6 col-lg-3">
+                <div class="metric-card">
+                    <div class="metric-icon text-cyan"><i class="bi bi-person-bounding-box"></i></div>
+                    <div class="metric-data">
+                        <span class="metric-label">Personas hoy</span>
+                        <h2 class="metric-value" id="statTodayPersons">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="metric-card">
+                    <div class="metric-icon text-emerald"><i class="bi bi-camera-video"></i></div>
+                    <div class="metric-data">
+                        <span class="metric-label">Eventos hoy</span>
+                        <h2 class="metric-value" id="statTodayEvents">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="metric-card">
+                    <div class="metric-icon text-warning"><i class="bi bi-bell-fill"></i></div>
+                    <div class="metric-data">
+                        <span class="metric-label">Última detección</span>
+                        <h2 class="metric-value-sm" id="statLatestAlert">Ninguna</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="metric-card">
+                    <div class="metric-icon text-danger"><i class="bi bi-hdd-network"></i></div>
+                    <div class="metric-data">
+                        <span class="metric-label">Almacenamiento</span>
+                        <h2 class="metric-value-sm" id="statStorage">—</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <!-- CÁMARAS Y LÍNEA DE TIEMPO -->
+            <div class="col-12 col-xl-8">
+                <div class="cctv-viewport-card">
+                    <div class="viewport-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-grid-3x3-gap text-emerald"></i>
+                            <span class="camera-name font-mono">CÁMARAS EN VIVO</span>
+                            <span class="badge bg-dark-subtle text-secondary font-mono" id="camCountBadge">0</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="btn-group btn-group-sm" role="group" aria-label="Distribución">
+                                <button class="btn btn-filter" data-layout="1" title="1 columna"><i class="bi bi-square"></i></button>
+                                <button class="btn btn-filter" data-layout="2" title="2 columnas"><i class="bi bi-layout-split"></i></button>
+                                <button class="btn btn-filter" data-layout="3" title="3 columnas"><i class="bi bi-grid-3x3"></i></button>
+                            </div>
+                            <button class="btn btn-filter btn-sm" id="btnQuality" title="Calidad de vídeo (baja = menos datos fuera de casa)">
+                                <i class="bi bi-reception-4"></i> <span id="qualityText">Alta</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="camera-grid" id="cameraGrid" data-layout="2">
+                        <div class="camera-empty" id="cameraEmpty">
+                            <i class="bi bi-camera-video-off display-5 text-secondary mb-3"></i>
+                            <h5>No hay cámaras configuradas</h5>
+                            <p class="text-secondary small mb-3">Añade la webcam de este PC o una cámara Wi-Fi (RTSP). La IA vigila desde el servidor, aunque cierres el navegador.</p>
+                            <button class="btn btn-emerald" id="btnAddFirstCamera"><i class="bi bi-plus-circle me-1"></i> Añadir cámara</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LÍNEA DE TIEMPO -->
+                <div class="timeline-card mt-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-activity text-emerald"></i>
+                            <span class="small text-uppercase fw-semibold">Últimas 24 horas</span>
+                        </div>
+                        <span class="small text-secondary font-mono" id="timelineStats">0 eventos</span>
+                    </div>
+                    <div class="timeline-bar-wrapper">
+                        <div class="timeline-hours-markers" id="timelineMarkers"></div>
+                        <div class="timeline-track" id="timelineTrack"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GALERÍA -->
+            <div class="col-12 col-xl-4">
+                <div class="gallery-card">
+                    <div class="gallery-header">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h5 class="mb-0 text-white font-mono d-flex align-items-center gap-2">
+                                <i class="bi bi-shield-check text-cyan"></i> Registro de eventos
+                            </h5>
+                            <span class="badge bg-dark-subtle text-secondary" id="galleryCountBadge">0</span>
+                        </div>
+                        <div class="event-filter-tabs btn-group w-100 mb-2">
+                            <button class="btn btn-sm btn-filter active" data-filter="all">Todos</button>
+                            <button class="btn btn-sm btn-filter" data-filter="person" title="Personas"><i class="bi bi-person-fill"></i></button>
+                            <button class="btn btn-sm btn-filter" data-filter="vehicle" title="Vehículos"><i class="bi bi-car-front-fill"></i></button>
+                            <button class="btn btn-sm btn-filter" data-filter="animal" title="Animales"><i class="bi bi-bug-fill"></i></button>
+                            <button class="btn btn-sm btn-filter" data-filter="manual" title="Capturas manuales"><i class="bi bi-camera"></i></button>
+                            <button class="btn btn-sm btn-filter" data-filter="starred" title="Protegidos"><i class="bi bi-star-fill text-warning"></i></button>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <select class="form-select form-select-sm bg-dark text-white border-secondary" id="cameraFilter" aria-label="Filtrar por cámara">
+                                <option value="">Todas las cámaras</option>
+                            </select>
+                            <div class="input-group input-group-sm">
+                                <input type="date" class="form-control form-control-sm bg-dark text-white border-secondary" id="dateFilter" aria-label="Fecha">
+                                <button class="btn btn-outline-secondary" type="button" id="clearFilter" title="Limpiar fecha"><i class="bi bi-x"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="gallery-body" id="captureGallery"></div>
+                    <div class="gallery-footer d-flex justify-content-between align-items-center">
+                        <button class="btn btn-outline-secondary btn-sm" id="btnPrevPage" disabled aria-label="Anterior"><i class="bi bi-chevron-left"></i></button>
+                        <span class="small text-secondary font-mono" id="pageIndicator">Página 1 / 1</span>
+                        <button class="btn btn-outline-secondary btn-sm" id="btnNextPage" disabled aria-label="Siguiente"><i class="bi bi-chevron-right"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Plantilla de tarjeta de cámara -->
+    <template id="cameraTileTemplate">
+        <div class="camera-tile">
+            <div class="tile-header">
+                <span class="tile-status badge"></span>
+                <span class="tile-name font-mono"></span>
+                <span class="tile-info font-mono text-secondary ms-auto"></span>
+            </div>
+            <div class="tile-view">
+                <img class="tile-img" alt="Vista en vivo">
+                <canvas class="tile-canvas"></canvas>
+                <div class="roi-overlay tile-roi"><span class="roi-label">ZONA ROI</span><span class="roi-handle"></span></div>
+                <div class="tile-offline">
+                    <i class="bi bi-wifi-off display-6 mb-2"></i>
+                    <span class="tile-offline-text">Conectando…</span>
+                </div>
+                <div class="hud-alert-banner tile-alert"><i class="bi bi-exclamation-triangle-fill me-2"></i><span></span></div>
+                <div class="roi-toolbar">
+                    <button class="btn btn-sm btn-emerald" data-roi="save"><i class="bi bi-check-lg"></i> Guardar zona</button>
+                    <button class="btn btn-sm btn-outline-warning" data-roi="disable">Desactivar</button>
+                    <button class="btn btn-sm btn-outline-light" data-roi="cancel">Cancelar</button>
+                </div>
+            </div>
+            <div class="tile-footer">
+                <button class="btn btn-sm btn-outline-light" data-act="snapshot" title="Captura manual"><i class="bi bi-camera"></i></button>
+                <button class="btn btn-sm btn-outline-secondary" data-act="roi" title="Zona de detección (ROI)"><i class="bi bi-bounding-box-circles"></i> <span>ROI</span></button>
+                <button class="btn btn-sm btn-outline-secondary ms-auto" data-act="fullscreen" title="Pantalla completa"><i class="bi bi-fullscreen"></i></button>
+            </div>
+        </div>
+    </template>
+
+    <!-- MODAL: VISOR FORENSE -->
+    <div class="modal fade" id="imagePreviewModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content bg-dark border-secondary text-white">
+                <div class="modal-header border-secondary py-2 px-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-danger" id="modalEventBadge">—</span>
+                        <h6 class="modal-title font-mono mb-0" id="modalTitle">Registro forense</h6>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body p-0 text-center position-relative">
+                    <div class="media-type-switcher position-absolute top-0 end-0 m-3 z-3">
+                        <div class="btn-group btn-group-sm shadow">
+                            <button class="btn btn-dark active" id="btnViewPhoto"><i class="bi bi-image"></i> Foto</button>
+                            <button class="btn btn-dark" id="btnViewVideo"><i class="bi bi-play-circle"></i> Clip</button>
+                        </div>
+                    </div>
+                    <div id="photoViewerContainer" class="p-3">
+                        <div class="forensic-photo">
+                            <img id="previewImage" class="rounded border border-secondary shadow-lg" alt="Captura">
+                            <canvas id="previewCanvas"></canvas>
+                        </div>
+                    </div>
+                    <div id="videoViewerContainer" class="p-3 d-none">
+                        <video id="previewVideo" class="img-fluid rounded border border-secondary shadow-lg" controls playsinline preload="metadata"></video>
+                        <div id="clipPending" class="text-secondary small py-5 d-none"><div class="spinner-border spinner-border-sm me-2"></div>El clip se está grabando…</div>
+                    </div>
+                    <div class="forensic-meta px-4 py-2 text-start border-top border-secondary">
+                        <div class="row g-2 font-mono small">
+                            <div class="col-6 col-md-3"><span class="text-secondary d-block">HORA:</span><span class="text-white" id="imageTimestamp">—</span></div>
+                            <div class="col-6 col-md-3"><span class="text-secondary d-block">CONFIANZA IA:</span><span class="text-cyan fw-bold" id="modalConfidence">—</span></div>
+                            <div class="col-6 col-md-3"><span class="text-secondary d-block">CÁMARA:</span><span class="text-white" id="modalCamera">—</span></div>
+                            <div class="col-6 col-md-3"><span class="text-secondary d-block">ESTADO:</span><span class="text-emerald" id="modalProtectedStatus">NORMAL</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary py-2 px-3 d-flex justify-content-between">
+                    <div>
+                        <button type="button" class="btn btn-outline-warning btn-sm" id="btnModalStar"><i class="bi bi-star me-1" id="starIcon"></i> <span id="starText">Proteger</span></button>
+                        <button type="button" class="btn btn-outline-danger btn-sm" id="btnModalDelete"><i class="bi bi-trash3 me-1"></i> Eliminar</button>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-light btn-sm" data-bs-dismiss="modal">Cerrar</button>
+                        <a class="btn btn-emerald btn-sm" id="downloadLink" download><i class="bi bi-download me-1"></i> Descargar</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: AJUSTES -->
+    <div class="modal fade" id="settingsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content bg-dark border-secondary text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title font-mono d-flex align-items-center gap-2"><i class="bi bi-sliders text-emerald"></i> Ajustes</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <ul class="nav nav-tabs settings-tabs mb-3 border-secondary" role="tablist">
+                        <li class="nav-item"><button class="nav-link active text-white" data-bs-toggle="tab" data-bs-target="#tabCameras" id="tabCamerasBtn"><i class="bi bi-camera-video text-info me-1"></i> Cámaras</button></li>
+                        <li class="nav-item"><button class="nav-link text-white" data-bs-toggle="tab" data-bs-target="#tabAlerts"><i class="bi bi-telegram text-cyan me-1"></i> Alertas</button></li>
+                        <li class="nav-item"><button class="nav-link text-white" data-bs-toggle="tab" data-bs-target="#tabAI"><i class="bi bi-cpu text-emerald me-1"></i> IA</button></li>
+                        <li class="nav-item"><button class="nav-link text-white" data-bs-toggle="tab" data-bs-target="#tabStorage"><i class="bi bi-hdd-stack text-warning me-1"></i> Grabación</button></li>
+                        <li class="nav-item"><button class="nav-link text-white" data-bs-toggle="tab" data-bs-target="#tabSchedule"><i class="bi bi-calendar-week text-danger me-1"></i> Horario</button></li>
+                        <li class="nav-item"><button class="nav-link text-white" data-bs-toggle="tab" data-bs-target="#tabAccount"><i class="bi bi-person-lock me-1"></i> Cuenta</button></li>
+                    </ul>
+
+                    <div class="tab-content">
+                        <!-- CÁMARAS -->
+                        <div class="tab-pane fade show active" id="tabCameras">
+                            <div id="cameraList" class="d-flex flex-column gap-2 mb-3"></div>
+                            <button class="btn btn-outline-emerald btn-sm mb-3" id="btnNewCamera"><i class="bi bi-plus-circle me-1"></i> Añadir cámara</button>
+
+                            <form id="cameraForm" class="p-3 rounded bg-black border border-secondary d-none" autocomplete="off">
+                                <input type="hidden" id="camId">
+                                <h6 class="font-mono mb-3" id="cameraFormTitle">Nueva cámara</h6>
+                                <div class="mb-3">
+                                    <label class="form-label small text-secondary" for="camName">Nombre</label>
+                                    <input type="text" class="form-control form-control-sm bg-dark border-secondary text-white" id="camName" maxlength="40" placeholder="Entrada principal" required>
+                                </div>
+                                <div class="mb-3">
+                                    <span class="form-label small text-secondary d-block">Tipo</span>
+                                    <div class="d-flex flex-wrap gap-3">
+                                        <div class="form-check"><input class="form-check-input" type="radio" name="camType" id="camTypeDshow" value="dshow" checked><label class="form-check-label small" for="camTypeDshow"><i class="bi bi-webcam me-1"></i> Webcam de este PC</label></div>
+                                        <div class="form-check"><input class="form-check-input" type="radio" name="camType" id="camTypeRtsp" value="rtsp"><label class="form-check-label small" for="camTypeRtsp"><i class="bi bi-wifi me-1"></i> Cámara Wi-Fi / IP (RTSP)</label></div>
+                                    </div>
+                                </div>
+                                <div class="mb-3" id="dshowSection">
+                                    <label class="form-label small text-secondary" for="camDevice">Dispositivo</label>
+                                    <div class="input-group input-group-sm">
+                                        <select class="form-select bg-dark border-secondary text-white" id="camDevice"></select>
+                                        <button type="button" class="btn btn-outline-secondary" id="btnRefreshDevices" title="Volver a buscar"><i class="bi bi-arrow-clockwise"></i></button>
+                                    </div>
+                                </div>
+                                <div id="rtspSection" class="d-none">
+                                    <div class="mb-2">
+                                        <label class="form-label small text-secondary" for="camUrl">URL RTSP</label>
+                                        <input type="text" class="form-control form-control-sm bg-dark border-secondary text-white font-mono" id="camUrl" placeholder="rtsp://usuario:clave@192.168.1.50:554/stream1">
+                                        <span class="small text-secondary hint">Tapo: <code>/stream1</code> · Reolink: <code>/h264Preview_01_main</code> · Ezviz: <code>/H.264</code></span>
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+                                        <select class="form-select form-select-sm bg-dark border-secondary text-white w-auto" id="camTransport" aria-label="Transporte">
+                                            <option value="tcp">TCP (estable)</option>
+                                            <option value="udp">UDP (menor latencia)</option>
+                                        </select>
+                                        <button type="button" class="btn btn-outline-info btn-sm" id="btnTestRtsp"><i class="bi bi-broadcast me-1"></i> Probar</button>
+                                        <span class="small" id="rtspTestResult"></span>
+                                    </div>
+                                </div>
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" id="camEnabled" checked>
+                                    <label class="form-check-label small" for="camEnabled">Cámara activa</label>
+                                </div>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <button type="submit" class="btn btn-emerald btn-sm"><i class="bi bi-check-circle me-1"></i> Guardar cámara</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btnCancelCamera">Cancelar</button>
+                                    <span class="small text-danger align-self-center" id="cameraFormError"></span>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- ALERTAS -->
+                        <div class="tab-pane fade" id="tabAlerts">
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="telegramEnabled" data-setting="telegram_enabled">
+                                <label class="form-check-label fw-semibold" for="telegramEnabled">Alertas y comandos por Telegram</label>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small text-secondary" for="telegramToken">Token del bot (@BotFather)</label>
+                                <input type="password" class="form-control form-control-sm bg-black border-secondary text-white font-mono" id="telegramToken" placeholder="123456789:ABCdef…" autocomplete="off">
+                                <span class="small text-secondary hint" id="telegramTokenHint"></span>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small text-secondary" for="telegramChatId">Chat ID (@userinfobot)</label>
+                                <input type="text" class="form-control form-control-sm bg-black border-secondary text-white font-mono" id="telegramChatId" data-setting="telegram_chat_id" placeholder="123456789">
+                            </div>
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="telegramSendClips" data-setting="telegram_send_clips">
+                                <label class="form-check-label small" for="telegramSendClips">Enviar también el clip de vídeo cuando esté listo</label>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <button type="button" class="btn btn-outline-cyan btn-sm" id="btnTestTelegram"><i class="bi bi-send me-1"></i> Probar envío</button>
+                                <span class="small" id="telegramTestResult"></span>
+                            </div>
+                            <div class="small text-secondary p-2 rounded border border-secondary">
+                                Comandos del bot: <code>/estado</code> <code>/foto 1</code> <code>/armar</code> <code>/encasa</code> <code>/desarmar</code> <code>/clip</code>.
+                                Las alertas incluyen botones para desarmar 1 h o ver el clip.
+                            </div>
+                            <hr class="border-secondary">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="whatsappEnabled" data-setting="whatsapp_enabled">
+                                <label class="form-check-label small" for="whatsappEnabled">WhatsApp vía Twilio (requiere credenciales en .env)</label>
+                            </div>
+                            <input type="text" class="form-control form-control-sm bg-black border-secondary text-white font-mono" id="whatsappPhone" data-setting="whatsapp_phone" placeholder="+18095551234" aria-label="Teléfono WhatsApp">
+                        </div>
+
+                        <!-- IA -->
+                        <div class="tab-pane fade" id="tabAI">
+                            <div class="mb-3">
+                                <label class="form-label small text-secondary" for="aiModel">Modelo</label>
+                                <select class="form-select form-select-sm bg-dark border-secondary text-white" id="aiModel" data-setting="model">
+                                    <option value="yolox_nano">YOLOX-Nano — rápido (recomendado para este PC)</option>
+                                    <option value="yolox_tiny">YOLOX-Tiny — más preciso, unas 3 veces más CPU</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between"><label class="form-label small text-secondary" for="aiThreshold">Umbral de confianza</label><span class="small font-mono text-cyan" data-label-for="aiThreshold"></span></div>
+                                <input type="range" class="form-range" min="25" max="95" step="5" id="aiThreshold" data-setting="ai_threshold" data-scale="100" data-suffix="%">
+                            </div>
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between"><label class="form-label small text-secondary" for="detectionFps">Análisis por segundo (por cámara)</label><span class="small font-mono text-cyan" data-label-for="detectionFps"></span></div>
+                                <input type="range" class="form-range" min="1" max="10" step="1" id="detectionFps" data-setting="detection_fps" data-suffix=" fps">
+                            </div>
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between"><label class="form-label small text-secondary" for="minFrames">Confirmación (frames seguidos)</label><span class="small font-mono text-cyan" data-label-for="minFrames"></span></div>
+                                <input type="range" class="form-range" min="1" max="6" step="1" id="minFrames" data-setting="min_consecutive_frames">
+                                <span class="small text-secondary hint">Más frames = menos falsas alarmas, pero reacción algo más lenta.</span>
+                            </div>
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between"><label class="form-label small text-secondary" for="cooldown">Pausa entre eventos</label><span class="small font-mono text-cyan" data-label-for="cooldown"></span></div>
+                                <input type="range" class="form-range" min="3" max="120" step="1" id="cooldown" data-setting="cooldown_seconds" data-suffix=" s">
+                            </div>
+                            <span class="form-label small text-secondary d-block">Objetos que generan eventos</span>
+                            <div class="d-flex flex-wrap gap-3 mb-2">
+                                <div class="form-check"><input class="form-check-input class-group" type="checkbox" value="person" id="clsPerson"><label class="form-check-label small" for="clsPerson">Personas</label></div>
+                                <div class="form-check"><input class="form-check-input class-group" type="checkbox" value="vehicle" id="clsVehicle"><label class="form-check-label small" for="clsVehicle">Vehículos</label></div>
+                                <div class="form-check"><input class="form-check-input class-group" type="checkbox" value="animal" id="clsAnimal"><label class="form-check-label small" for="clsAnimal">Animales</label></div>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="sirenEnabled" data-setting="siren_sound_enabled">
+                                <label class="form-check-label small" for="sirenEnabled">Sirena en el panel cuando hay alerta (modo Armado)</label>
+                            </div>
+                        </div>
+
+                        <!-- GRABACIÓN Y RETENCIÓN -->
+                        <div class="tab-pane fade" id="tabStorage">
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="clipsEnabled" data-setting="video_clips_enabled">
+                                <label class="form-check-label fw-semibold" for="clipsEnabled">Grabar clips de vídeo (MP4)</label>
+                            </div>
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between"><label class="form-label small text-secondary" for="preRoll">Segundos ANTES de la detección</label><span class="small font-mono text-cyan" data-label-for="preRoll"></span></div>
+                                <input type="range" class="form-range" min="0" max="20" step="1" id="preRoll" data-setting="pre_roll_seconds" data-suffix=" s">
+                            </div>
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between"><label class="form-label small text-secondary" for="postRoll">Segundos DESPUÉS de la última detección</label><span class="small font-mono text-cyan" data-label-for="postRoll"></span></div>
+                                <input type="range" class="form-range" min="3" max="60" step="1" id="postRoll" data-setting="post_roll_seconds" data-suffix=" s">
+                            </div>
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between"><label class="form-label small text-secondary" for="maxClip">Duración máxima del clip</label><span class="small font-mono text-cyan" data-label-for="maxClip"></span></div>
+                                <input type="range" class="form-range" min="10" max="120" step="5" id="maxClip" data-setting="max_clip_seconds" data-suffix=" s">
+                            </div>
+                            <hr class="border-secondary">
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between"><label class="form-label small text-secondary" for="retention">Días de retención</label><span class="small font-mono text-warning" data-label-for="retention"></span></div>
+                                <input type="range" class="form-range" min="1" max="90" step="1" id="retention" data-setting="retention_days" data-suffix=" días">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small text-secondary" for="maxStorage">Espacio máximo en disco (GB, 0 = sin límite)</label>
+                                <input type="number" class="form-control form-control-sm bg-dark border-secondary text-white w-auto" id="maxStorage" data-setting="max_storage_gb" min="0" step="1">
+                                <span class="small text-secondary hint">Los eventos protegidos con <i class="bi bi-star-fill text-warning"></i> nunca se borran.</span>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center pt-2 border-top border-secondary">
+                                <span class="small text-secondary" id="storageInfo">—</span>
+                                <button type="button" class="btn btn-outline-warning btn-sm" id="btnManualCleanup"><i class="bi bi-trash2 me-1"></i> Purgar ahora</button>
+                            </div>
+                        </div>
+
+                        <!-- HORARIO -->
+                        <div class="tab-pane fade" id="tabSchedule">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="scheduleEnabled" data-setting="schedule_enabled">
+                                <label class="form-check-label fw-semibold" for="scheduleEnabled">Cambiar de modo automáticamente según el horario</label>
+                            </div>
+                            <p class="small text-secondary">Fuera de las franjas se usa el modo elegido arriba. Si cambias de modo a mano durante una franja, el cambio dura hasta que empiece la siguiente.</p>
+                            <div id="scheduleRules" class="d-flex flex-column gap-2 mb-2"></div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnAddRule"><i class="bi bi-plus"></i> Añadir franja</button>
+                        </div>
+
+                        <!-- CUENTA -->
+                        <div class="tab-pane fade" id="tabAccount">
+                            <form id="passwordForm" autocomplete="off">
+                                <h6 class="font-mono">Cambiar contraseña</h6>
+                                <input type="password" class="form-control form-control-sm bg-dark border-secondary text-white mb-2" id="pwCurrent" placeholder="Contraseña actual" autocomplete="current-password" required>
+                                <input type="password" class="form-control form-control-sm bg-dark border-secondary text-white mb-2" id="pwNext" placeholder="Nueva contraseña (mín. 8)" autocomplete="new-password" minlength="8" required>
+                                <button type="submit" class="btn btn-outline-emerald btn-sm">Cambiar y cerrar las demás sesiones</button>
+                                <span class="small ms-2" id="pwResult"></span>
+                            </form>
+                            <hr class="border-secondary">
+                            <h6 class="font-mono">Acceso desde fuera de casa</h6>
+                            <p class="small text-secondary mb-0">
+                                Usa <b>Tailscale</b> (gratis): instálalo en este PC y en tu móvil, arranca el servidor con <code>HOST=0.0.0.0</code>
+                                y abre la IP de Tailscale del PC. <b>No abras puertos en el router.</b> Más detalles en el README.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <span class="small text-danger me-auto" id="settingsError"></span>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-emerald btn-sm" id="btnSaveSettings"><i class="bi bi-check-circle-fill me-1"></i> Guardar ajustes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toastContainer"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

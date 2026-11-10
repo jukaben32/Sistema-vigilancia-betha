@@ -1,357 +1,153 @@
-require('dotenv').config();
+const config = require('./src/config');
 const express = require('express');
 const http = require('http');
 const path = require('path');
 const fs = require('fs-extra');
-const moment = require('moment');
-const multer = require('multer');
-const { WebSocketServer } = require('ws');
+const helmet = require('helmet');
+const cookieParser = require('cookie-parser');
 
-const db = require('./database');
-const notifications = require('./notifications');
-const rtspBridge = require('./rtspBridge');
+const db = require('./src/db/database');
+const settings = require('./src/settings');
+const store = require('./src/store');
+const auth = require('./src/auth');
+const mode = require('./src/mode');
+const ws = require('./src/ws');
+const core = require('./src/core');
+const detector = require('./src/ai/detector');
+const manager = require('./src/cameras/manager');
+const retention = require('./src/retention');
+const { TelegramBot } = require('./src/alerts/telegramBot');
 
 const app = express();
 const server = http.createServer(app);
-const port = process.env.PORT || 3000;
+if (config.TRUST_PROXY) app.set('trust proxy', 1);
+app.disable('x-powered-by');
 
-// Directorio base de capturas
-const capturesDir = path.join(__dirname, 'captures');
-fs.ensureDirSync(capturesDir);
-
-// Configuración de Multer para subida de fotos y videos WebM
-const storage = multer.diskStorage({
-    destination: async (req, file, cb) => {
-        const now = moment();
-        const dest = path.join(capturesDir, now.format('YYYY'), now.format('MM'), now.format('DD'));
-        await fs.ensureDir(dest);
-        cb(null, dest);
+app.use(helmet({
+    contentSecurityPolicy: {
+        useDefaults: false,
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", 'https://cdn.jsdelivr.net'],
+            styleSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://fonts.googleapis.com'],
+            fontSrc: ["'self'", 'https://fonts.gstatic.com', 'https://cdn.jsdelivr.net'],
+            imgSrc: ["'self'", 'data:', 'blob:'],
+            mediaSrc: ["'self'", 'blob:'],
+            connectSrc: ["'self'"],
+            objectSrc: ["'none'"],
+            frameAncestors: ["'none'"],
+            baseUri: ["'self'"],
+            formAction: ["'self'"]
+        }
     },
-    filename: (req, file, cb) => {
-        const now = moment();
-        const prefix = file.fieldname === 'video' ? 'clip' : 'capture';
-        const ext = file.fieldname === 'video' ? '.webm' : '.jpg';
-        cb(null, `${prefix}_${now.format('HHmmss')}_${Date.now()}${ext}`);
-    }
+    hsts: false,                      // se accede por http en LAN/Tailscale; HTTPS lo pone el túnel
+    crossOriginEmbedderPolicy: false
+}));
+app.use(express.json({ limit: '100kb' }));
+app.use(cookieParser());
+
+// ==========================================
+// RUTAS PÚBLICAS (login y recursos estáticos sin datos)
+// ==========================================
+app.get(['/', '/index.html'], auth.requireAuth, (req, res) => {
+    res.sendFile(path.join(config.PUBLIC_DIR, 'index.html'));
 });
+// Sin maxAge: el navegador revalida con ETag y recibe las actualizaciones al instante
+app.use(express.static(config.PUBLIC_DIR, { index: false }));
 
-const upload = multer({
-    storage: storage,
-    limits: { fileSize: 50 * 1024 * 1024 } // 50MB max para video
-});
+app.use('/api', auth.requireCsrfHeader);
+app.use('/api/auth', require('./src/routes/auth'));
 
-// Middlewares
-app.use(express.json({ limit: '60mb' }));
-app.use(express.urlencoded({ extended: true, limit: '60mb' }));
-app.use(express.static(path.join(__dirname)));
-app.use('/captures', express.static(capturesDir));
+// ==========================================
+// RUTAS PROTEGIDAS
+// ==========================================
+app.use('/api', auth.requireAuth, require('./src/routes/api'));
+app.use('/captures', auth.requireAuth, express.static(config.CAPTURES_DIR, {
+    index: false,
+    dotfiles: 'deny',
+    immutable: true,
+    maxAge: '365d',
+    setHeaders: (res) => res.set('Cache-Control', 'private, max-age=31536000, immutable')
+}));
 
-// WebSocket Server para notificaciones en vivo en el Dashboard
-const wss = new WebSocketServer({ server });
-
-function broadcastWs(type, data) {
-    const payload = JSON.stringify({ type, data, timestamp: new Date().toISOString() });
-    wss.clients.forEach(client => {
-        if (client.readyState === 1) { // OPEN
-            client.send(payload);
-        }
-    });
-}
-
-wss.on('connection', (ws) => {
-    // Enviar mensaje de bienvenida
-    ws.send(JSON.stringify({ type: 'CONNECTED', message: 'Conectado al servidor de vigilancia Betha Sentinel' }));
+app.use('/api', (req, res) => res.status(404).json({ success: false, error: 'Ruta no encontrada' }));
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+    if (err.type === 'entity.parse.failed') return res.status(400).json({ success: false, error: 'JSON no válido' });
+    console.error('[API] Error:', err);
+    res.status(500).json({ success: false, error: 'Error interno del servidor' });
 });
 
 // ==========================================
-// RUTAS DE LA API REST
+// ARRANQUE
 // ==========================================
-
-// Guardar Captura (soporta multipart con video y fallback base64)
-app.post('/api/save-capture', upload.fields([
-    { name: 'photo', maxCount: 1 },
-    { name: 'video', maxCount: 1 }
-]), async (req, res) => {
-    try {
-        let photoPath = '';
-        let videoPath = null;
-        let photoAbsolutePath = '';
-
-        const timestamp = req.body.timestamp || new Date().toISOString();
-        const eventType = req.body.eventType || req.body.event_type || 'person';
-        const label = req.body.label || (eventType === 'person' ? 'Persona' : 'Movimiento');
-        const confidence = parseFloat(req.body.confidence) || 0.85;
-        const notes = req.body.notes || '';
-
-        // Si se subió foto vía multipart
-        if (req.files && req.files['photo'] && req.files['photo'][0]) {
-            const file = req.files['photo'][0];
-            photoAbsolutePath = file.path;
-            const relative = path.relative(__dirname, file.path).replace(/\\/g, '/');
-            photoPath = `/${relative}`;
-        } else if (req.body.image) {
-            // Fallback de Base64 existente
-            const date = moment(timestamp);
-            const dayDir = path.join(capturesDir, date.format('YYYY'), date.format('MM'), date.format('DD'));
-            await fs.ensureDir(dayDir);
-            const fileName = `capture_${date.format('HHmmss')}_${Date.now()}.jpg`;
-            photoAbsolutePath = path.join(dayDir, fileName);
-
-            const base64Data = req.body.image.replace(/^data:image\/[a-z]+;base64,/, '');
-            await fs.writeFile(photoAbsolutePath, base64Data, 'base64');
-            photoPath = `/captures/${date.format('YYYY')}/${date.format('MM')}/${date.format('DD')}/${fileName}`;
-        }
-
-        // Si se subió video clip
-        if (req.files && req.files['video'] && req.files['video'][0]) {
-            const videoFile = req.files['video'][0];
-            const relativeVideo = path.relative(__dirname, videoFile.path).replace(/\\/g, '/');
-            videoPath = `/${relativeVideo}`;
-        }
-
-        if (!photoPath) {
-            return res.status(400).json({ success: false, error: 'No se proporcionó imagen válida' });
-        }
-
-        // Registrar en base de datos SQLite
-        const savedEvent = await db.insertEvent({
-            timestamp,
-            eventType,
-            label,
-            confidence,
-            photoPath,
-            videoPath,
-            notes
-        });
-
-        // Difundir en tiempo real a los navegadores abiertos
-        broadcastWs('NEW_EVENT', savedEvent);
-
-        // Disparar alertas externas (Telegram Bot / WhatsApp)
-        notifications.dispatchAlerts(savedEvent, photoAbsolutePath);
-
-        res.json({
-            success: true,
-            event: savedEvent
-        });
-    } catch (error) {
-        console.error('[API] Error al guardar captura:', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// Obtener lista paginada y filtrada de eventos
-app.get('/api/events', async (req, res) => {
-    try {
-        const { page = 1, limit = 20, date, type, starred } = req.query;
-        const result = await db.getEvents({
-            page,
-            limit,
-            date: date || null,
-            eventType: type || null,
-            starred: starred === 'true'
-        });
-        res.json(result);
-    } catch (error) {
-        console.error('[API] Error al consultar eventos:', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// Eventos para la línea de tiempo interactiva
-app.get('/api/timeline', async (req, res) => {
-    try {
-        const { date } = req.query;
-        const events = await db.getTimelineEvents(date);
-        res.json(events);
-    } catch (error) {
-        console.error('[API] Error al obtener timeline:', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// Estadísticas del sistema
-app.get('/api/stats', async (req, res) => {
-    try {
-        const stats = await db.getStats();
-        res.json(stats);
-    } catch (error) {
-        console.error('[API] Error al obtener estadísticas:', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// Alternar favorito/estrella para proteger evento
-app.patch('/api/events/:id/star', async (req, res) => {
-    try {
-        const updated = await db.toggleStar(req.params.id);
-        if (!updated) return res.status(404).json({ success: false, error: 'Evento no encontrado' });
-        broadcastWs('EVENT_UPDATED', updated);
-        res.json({ success: true, ...updated });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// Eliminar un evento y sus archivos asociados
-app.delete('/api/events/:id', async (req, res) => {
-    try {
-        const event = await db.deleteEvent(req.params.id);
-        if (!event) return res.status(404).json({ success: false, error: 'Evento no encontrado' });
-
-        // Eliminar archivos del disco
-        if (event.photo_path) {
-            const p = path.join(__dirname, event.photo_path.replace(/^\//, ''));
-            if (fs.existsSync(p)) fs.unlinkSync(p);
-        }
-        if (event.video_path) {
-            const v = path.join(__dirname, event.video_path.replace(/^\//, ''));
-            if (fs.existsSync(v)) fs.unlinkSync(v);
-        }
-
-        broadcastWs('EVENT_DELETED', { id: event.id });
-        res.json({ success: true });
-    } catch (error) {
-        console.error('[API] Error al eliminar evento:', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// Obtener configuraciones del sistema
-app.get('/api/settings', async (req, res) => {
-    try {
-        const settings = await db.getAllSettings();
-        // Ocultar parcialmente el token de bot por seguridad si existe
-        const safeSettings = { ...settings };
-        if (safeSettings.telegram_bot_token && safeSettings.telegram_bot_token.length > 8) {
-            safeSettings.telegram_bot_token_masked = safeSettings.telegram_bot_token.slice(0, 4) + '••••••••' + safeSettings.telegram_bot_token.slice(-4);
-        }
-        res.json(safeSettings);
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// Guardar configuraciones
-app.post('/api/settings', async (req, res) => {
-    try {
-        const updated = await db.updateMultipleSettings(req.body);
-        broadcastWs('SETTINGS_UPDATED', updated);
-        res.json({ success: true, settings: updated });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// Probar conexión de Telegram
-app.post('/api/settings/test-telegram', async (req, res) => {
-    try {
-        const { token, chatId } = req.body;
-        const result = await notifications.testTelegram(token, chatId);
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// Ejecutar limpieza manual de retención
-app.post('/api/cleanup', async (req, res) => {
-    try {
-        const settings = await db.getAllSettings();
-        const days = req.body.days || settings.retention_days || 15;
-        const result = await db.cleanupOldEvents(days);
-        res.json({ success: true, ...result });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// ==========================================
-// PUENTE RTSP AUTOMÁTICO PARA CÁMARAS WI-FI
-// ==========================================
-
-// Stream MJPEG continuo transcodificado por FFmpeg
-app.get('/api/stream/mjpeg', async (req, res) => {
-    try {
-        const settings = await db.getAllSettings();
-        // Solo se usa la URL guardada en Ajustes (nunca una enviada por la petición),
-        // así nadie puede pedirle a FFmpeg que abra archivos o URLs arbitrarias
-        const url = settings.rtsp_url;
-        const transport = settings.rtsp_transport === 'udp' ? 'udp' : 'tcp';
-
-        if (!url || !url.startsWith('rtsp://')) {
-            return res.status(400).send('No se ha configurado una URL RTSP válida (debe empezar con rtsp://).');
-        }
-
-        rtspBridge.handleClient(req, res, url, transport);
-    } catch (error) {
-        console.error('[RTSP API] Error:', error);
-        res.status(500).send('Error en el puente RTSP');
-    }
-});
-
-// Probar conexión directa con una cámara Wi-Fi
-app.post('/api/stream/test-rtsp', async (req, res) => {
-    try {
-        const { url } = req.body;
-        const transport = req.body.transport === 'udp' ? 'udp' : 'tcp';
-        const result = await rtspBridge.testConnection(url, transport);
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// Detener stream RTSP
-app.post('/api/stream/stop', (req, res) => {
-    rtspBridge.stop();
-    res.json({ success: true });
-});
-
-// Compatibilidad con la ruta anterior /api/captures
-app.get('/api/captures', async (req, res) => {
-    try {
-        const result = await db.getEvents({ limit: 100 });
-        const legacyFormat = result.events.map(e => ({
-            id: e.id,
-            path: e.photo_path,
-            videoPath: e.video_path,
-            timestamp: e.timestamp,
-            label: e.label,
-            confidence: e.confidence,
-            is_starred: e.is_starred
-        }));
-        res.json(legacyFormat);
-    } catch (error) {
-        res.status(500).json([]);
-    }
-});
-
-// ==========================================
-// INICIALIZACIÓN Y PROGRAMADOR DE RETENCIÓN
-// ==========================================
+let bot = null;
+let retentionTimer = null;
 
 async function startServer() {
-    await db.init();
+    await fs.ensureDir(config.CAPTURES_DIR);
+    await db.init(settings.defaults());
+    await store.load();
+    await auth.ensureFromEnv();
+    await db.purgeExpiredSessions();
 
-    // Programar limpieza automática cada 6 horas
-    setInterval(async () => {
-        try {
-            const settings = await db.getAllSettings();
-            await db.cleanupOldEvents(settings.retention_days || 15);
-        } catch (err) {
-            console.error('[CRON] Error en purga de retención:', err);
+    mode.start();
+    ws.init(server);
+    core.start();
+
+    try {
+        await detector.load(store.get().model);
+    } catch (e) {
+        console.error(`[IA] ${e.message}`);
+    }
+
+    await manager.start();
+
+    bot = new TelegramBot(core.botActions);
+    bot.start();
+
+    const runRetention = () => retention.run(store.get()).catch((e) => console.error('[RETENCIÓN]', e.message));
+    setTimeout(runRetention, 60 * 1000);
+    retentionTimer = setInterval(runRetention, 6 * 3600 * 1000);
+
+    server.listen(config.PORT, config.HOST, () => {
+        const shown = config.HOST === '0.0.0.0' ? 'localhost' : config.HOST;
+        console.log('====================================================');
+        console.log('🛡️  BETHA SENTINEL v3 // VIGILANCIA IA 24/7');
+        console.log(`📡 Panel: http://${shown}:${config.PORT}`);
+        console.log(`📹 Cámaras: ${manager.list().length} | 🧠 IA: ${detector.info().status}`);
+        if (!auth.isSetup()) console.log(`🔑 Abre http://localhost:${config.PORT} en ESTE PC para crear la contraseña.`);
+        if (config.HOST !== '127.0.0.1' && config.HOST !== 'localhost') {
+            console.log(`🌐 Escuchando en ${config.HOST}: accesible desde la red. No abras puertos del router; usa Tailscale.`);
         }
-    }, 6 * 60 * 60 * 1000);
-
-    server.listen(port, () => {
-        console.log(`====================================================`);
-        console.log(`🛡️  BETHA SENTINEL // SISTEMA DE VIGILANCIA IA ACTIVO`);
-        console.log(`📡 Servidor iniciado en: http://localhost:${port}`);
-        console.log(`⚡ WebSockets en tiempo real activos`);
-        console.log(`💾 Base de datos SQLite inicializada`);
-        console.log(`====================================================`);
+        console.log('====================================================');
     });
 }
 
-startServer();
+let shuttingDown = false;
+async function shutdown(signal) {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`\n[SISTEMA] ${signal}: cerrando de forma ordenada...`);
+    const force = setTimeout(() => process.exit(1), 8000);
+    try {
+        clearInterval(retentionTimer);
+        if (bot) bot.stop();
+        mode.stop();
+        core.stop();
+        manager.stopAll();
+        ws.close();
+        await new Promise((r) => server.close(r));
+        await db.close();
+    } finally {
+        clearTimeout(force);
+        process.exit(0);
+    }
+}
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+
+startServer().catch((e) => {
+    console.error('[SISTEMA] No se pudo arrancar:', e);
+    process.exit(1);
+});

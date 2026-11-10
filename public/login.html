@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <title>Betha Sentinel — Acceso</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2310b981'><path d='M12 2L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-3z'/></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="cctv-body login-body">
+    <main class="login-card">
+        <div class="text-center mb-4">
+            <i class="bi bi-shield-shaded text-emerald login-shield"></i>
+            <h1 class="brand-title mt-2 mb-0">BETHA SENTINEL</h1>
+            <span class="brand-subtitle">VIGILANCIA IA 24/7</span>
+        </div>
+
+        <div id="loading" class="text-center text-secondary small">Comprobando…</div>
+
+        <!-- Login -->
+        <form id="loginForm" class="d-none" autocomplete="on">
+            <label for="loginPassword" class="form-label small text-secondary">Contraseña de administrador</label>
+            <input type="password" id="loginPassword" class="form-control bg-black border-secondary text-white mb-3" autocomplete="current-password" required autofocus>
+            <button type="submit" class="btn btn-emerald w-100"><i class="bi bi-box-arrow-in-right me-1"></i> Entrar</button>
+        </form>
+
+        <!-- Primera configuración -->
+        <form id="setupForm" class="d-none" autocomplete="off">
+            <p class="small text-secondary">Primera vez: crea la contraseña que protegerá el panel, las grabaciones y las cámaras.</p>
+            <label for="setupPassword" class="form-label small text-secondary">Nueva contraseña (mínimo 8 caracteres)</label>
+            <input type="password" id="setupPassword" class="form-control bg-black border-secondary text-white mb-2" autocomplete="new-password" minlength="8" required>
+            <label for="setupConfirm" class="form-label small text-secondary">Repite la contraseña</label>
+            <input type="password" id="setupConfirm" class="form-control bg-black border-secondary text-white mb-3" autocomplete="new-password" minlength="8" required>
+            <button type="submit" class="btn btn-emerald w-100"><i class="bi bi-key-fill me-1"></i> Crear contraseña y entrar</button>
+        </form>
+
+        <!-- Configuración solo local -->
+        <div id="setupRemote" class="d-none small text-warning">
+            <i class="bi bi-exclamation-triangle-fill me-1"></i>
+            Aún no hay contraseña. Por seguridad, solo se puede crear desde el PC donde corre el servidor
+            (abre <code>http://localhost:3000</code> allí) o definiendo <code>ADMIN_PASSWORD</code> en el archivo <code>.env</code>.
+        </div>
+
+        <div id="loginError" class="small text-danger mt-3" role="alert"></div>
+    </main>
+    <script src="login.js"></script>
+</body>
+</html>
